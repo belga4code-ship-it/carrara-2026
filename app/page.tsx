@@ -21,7 +21,6 @@ interface FormDataState {
   previousDealing: string;
   salesContact: string;
   notes: string;
-  invoiceNo: string;
   branch: string;
 }
 
@@ -42,8 +41,7 @@ const initialFormData: FormDataState = {
   previousDealing: "",
   salesContact: "",
   notes: "",
-  invoiceNo: "INV-2026-089",
-  branch: "المركز الرئيسي طرابلس",
+  branch: "الإدارة الرئيسية",
 };
 
 function SurveyFormContent() {
@@ -57,11 +55,10 @@ function SurveyFormContent() {
   // التاريخ الحالي تلقائياً بتنسيق YYYY-MM-DD
   const currentDate = new Date().toISOString().split("T")[0];
 
-  // قراءة بيانات الفاتورة والفرع ديناميكياً من رابط الـ QR إن وجدت
+  // قراءة الفرع ديناميكياً من رابط الـ QR إن وجد
   useEffect(() => {
-    const inv = searchParams.get("inv") || searchParams.get("invoice") || "INV-2026-089";
-    const branch = searchParams.get("branch") || "المركز الرئيسي طرابلس";
-    setFormData((prev) => ({ ...prev, invoiceNo: inv, branch }));
+    const branch = searchParams.get("branch") || "الإدارة الرئيسية";
+    setFormData((prev) => ({ ...prev, branch }));
   }, [searchParams]);
 
   const handleInterestChange = (interest: string) => {
@@ -100,7 +97,7 @@ function SurveyFormContent() {
 
   const handleNextFromStep1 = () => {
     if (validateStep1()) {
-      setStep(2);
+      setStep(2); // الانتقال المباشر للاستبيان
     }
   };
 
@@ -112,14 +109,11 @@ function SurveyFormContent() {
       const response = await fetch("/api/survey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          hasProblem: false,
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        setStep(5);
+        setStep(4); // الانتقال لصفحة الشكر والنجاح
       } else {
         const errorData = await response.json();
         alert(`حدث خطأ: ${errorData.error || "فشل إرسال البيانات"}`);
@@ -132,46 +126,8 @@ function SurveyFormContent() {
     }
   };
 
-  const submitComplaint = async () => {
-    if (!formData.problemDetails.trim()) {
-      setErrors({ problemDetails: "يرجى كتابة تفاصيل المشكلة أو الملاحظة أولاً" });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/survey", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hasProblem: true,
-          problemDetails: formData.problemDetails,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          email: formData.email,
-          invoiceNo: formData.invoiceNo,
-          branch: formData.branch,
-        }),
-      });
-
-      if (response.ok) {
-        setStep(5);
-      } else {
-        const errorData = await response.json();
-        alert(`حدث خطأ: ${errorData.error || "فشل إرسال الشكوى"}`);
-      }
-    } catch (error) {
-      console.error("خطأ في الاتصال:", error);
-      alert("تعذر الاتصال بالخادم.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleBack = () => {
-    if (step === 3 || step === 4) {
-      setStep(2);
-    } else if (step === 2) {
+    if (step === 2) {
       setStep(1);
     }
   };
@@ -179,7 +135,6 @@ function SurveyFormContent() {
   const handleResetForm = () => {
     setFormData({
       ...initialFormData,
-      invoiceNo: formData.invoiceNo,
       branch: formData.branch,
     });
     setErrors({});
@@ -188,11 +143,9 @@ function SurveyFormContent() {
 
   const getProgressPercentage = () => {
     switch (step) {
-      case 1: return 25;
-      case 2: return 50;
-      case 3:
-      case 4: return 85;
-      case 5: return 100;
+      case 1: return 33;
+      case 2: return 75;
+      case 4: return 100;
       default: return 0;
     }
   };
@@ -201,7 +154,7 @@ function SurveyFormContent() {
     <div dir="rtl" className="min-h-screen bg-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans text-right">
       <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
         
-        {/* الهيدر مع زر الإحصائيات */}
+        {/* الهيدر مع شعار الفيل وزر الإحصائيات */}
         <div className="bg-slate-900 p-6 text-center text-white border-b-4 border-amber-600 relative">
           
           <Link
@@ -215,14 +168,23 @@ function SurveyFormContent() {
             <span>الإحصائيات</span>
           </Link>
 
+          {/* شعار الفيل والهوية البصرية */}
+          <div className="w-16 h-16 mx-auto mb-3 rounded-full p-0.5 bg-gradient-to-tr from-amber-500 to-amber-300 shadow-md flex items-center justify-center overflow-hidden">
+            <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center overflow-hidden">
+              <svg viewBox="0 0 24 24" className="w-10 h-10 text-amber-400 fill-current" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C9.5 2 7.5 3.5 6.8 5.6C5.1 6.2 4 7.8 4 9.7C4 11.2 4.8 12.5 6 13.3V18C6 19.1 6.9 20 8 20H9C10.1 20 11 19.1 11 18V17H13V18C13 19.1 13.9 20 15 20H16C17.1 20 18 19.1 18 18V13.3C19.2 12.5 20 11.2 20 9.7C20 7.8 18.9 6.2 17.2 5.6C16.5 3.5 14.5 2 12 2M12 4C13.7 4 15 5.3 15 7C15 8.7 13.7 10 12 10C10.3 10 9 8.7 9 7C9 5.3 10.3 4 12 4M7.5 14C8.3 14 9 13.3 9 12.5C9 11.7 8.3 11 7.5 11C6.7 11 6 11.7 6 12.5C6 13.3 6.7 14 7.5 14M16.5 14C17.3 14 18 13.3 18 12.5C18 11.7 17.3 11 16.5 11C15.7 11 15 11.7 15 12.5C15 13.3 15.7 14 16.5 14Z" />
+              </svg>
+            </div>
+          </div>
+
           <span className="text-amber-500 text-xs font-bold tracking-wider uppercase bg-amber-950/60 px-3 py-1 rounded-full border border-amber-600/30">
             تأسست 1991
           </span>
           <h1 className="text-2xl font-black mt-2 tracking-wide">شركة قرارة للرخام والجرانيت</h1>
-          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان زوار المعرض | {formData.branch}</p>
+          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان الزوار | {formData.branch}</p>
 
           {/* شريط التقدم */}
-          {step < 5 && (
+          {step < 4 && (
             <div className="w-full bg-slate-800 h-2 absolute bottom-0 left-0 overflow-hidden">
               <div
                 className="bg-amber-500 h-2 transition-all duration-500 ease-out shadow-lg"
@@ -243,23 +205,15 @@ function SurveyFormContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">أهلاً بك في جناحنا</h2>
+                <h2 className="text-2xl font-bold text-slate-900">أهلاً بك في الإدارة الرئيسية</h2>
                 <p className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
-                  يرجى إدخال اسمك الكريم ورقم الهاتف للمتابعة:
+                  يرجى إدخال اسمك الكريم ورقم الهاتف للمتابعة إلى الاستبيان:
                 </p>
               </div>
 
-              <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-xs text-slate-900 space-y-2 shadow-sm">
-                <div className="flex justify-between items-center border-b border-amber-200/60 pb-1.5">
-                  <span className="text-slate-600 font-medium">رقم الفاتورة:</span>
-                  <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-amber-300">
-                    {formData.invoiceNo}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-0.5">
-                  <span className="text-slate-600 font-medium">التاريخ:</span>
-                  <span className="font-semibold text-slate-900">{currentDate}</span>
-                </div>
+              <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-xs text-slate-900 flex justify-between items-center shadow-sm">
+                <span className="text-slate-600 font-medium">تاريخ اليوم:</span>
+                <span className="font-semibold text-slate-900">{currentDate}</span>
               </div>
 
               <div className="space-y-4 pt-2">
@@ -306,68 +260,13 @@ function SurveyFormContent() {
                 onClick={handleNextFromStep1}
                 className="w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-amber-600/20 text-base mt-4"
               >
-                المتابعة ←
+                الانتقال إلى الاستبيان ←
               </button>
             </div>
           )}
 
-          {/* الخطوة 2: اختيار المسار */}
+          {/* الخطوة 2: الاستبيان الشامل */}
           {step === 2 && (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-xl font-bold text-slate-900">مرحباً بك {formData.fullName}</h2>
-                <p className="text-slate-600 text-sm font-medium">كيف يمكننا خدمتك اليوم؟ يرجى اختيار أحد الخيارات التالية:</p>
-              </div>
-
-              <div className="space-y-4 pt-2">
-                <button 
-                  onClick={() => { setFormData({...formData, hasProblem: false}); setStep(3); }}
-                  className="w-full border-2 border-amber-600 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 font-bold p-5 rounded-2xl transition duration-200 text-right flex items-center justify-between shadow-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-600 text-white rounded-xl flex items-center justify-center font-bold">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <span className="block text-base font-bold">تعبئة استبيان الزيارة</span>
-                      <span className="block text-xs text-slate-600 font-normal mt-0.5">تقييم المنتجات والخدمات والجودة</span>
-                    </div>
-                  </div>
-                  <span className="text-amber-700 font-bold">←</span>
-                </button>
-
-                <button 
-                  onClick={() => { setFormData({...formData, hasProblem: true}); setStep(4); }}
-                  className="w-full border-2 border-red-500 bg-red-50/50 hover:bg-red-100/70 text-red-900 font-bold p-5 rounded-2xl transition duration-200 text-right flex items-center justify-between shadow-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-600 text-white rounded-xl flex items-center justify-center font-bold">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <span className="block text-base font-bold">تقديم شكوى أو ملاحظة</span>
-                      <span className="block text-xs text-slate-600 font-normal mt-0.5">متابعة خاصة ومباشرة من الإدارة</span>
-                    </div>
-                  </div>
-                  <span className="text-red-700 font-bold">←</span>
-                </button>
-              </div>
-
-              <button
-                onClick={handleBack}
-                className="w-full border border-slate-300 text-slate-600 font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition text-sm"
-              >
-                ← العودة للخطوة السابقة
-              </button>
-            </div>
-          )}
-
-          {/* الخطوة 3: الاستبيان الشامل */}
-          {step === 3 && (
             <div className="space-y-8">
               
               {/* تفاصيل الزائر */}
@@ -576,15 +475,15 @@ function SurveyFormContent() {
                 </div>
               </div>
 
-              {/* الملاحظات والإرسال */}
+              {/* الملاحظات أو الشكاوى والإرسال */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-1.5">ملاحظات أو مقترحات إضافية:</label>
+                  <label className="block text-sm font-bold text-slate-900 mb-1.5">ملاحظات، مقترحات أو شكاوى إضافية:</label>
                   <textarea 
                     rows={3}
                     value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                    placeholder="اكتب أي اقتراح أو استفسار إضافي..."
+                    onChange={(e) => setFormData({...formData, notes: e.target.value, problemDetails: e.target.value})}
+                    placeholder="اكتب أي اقتراح أو شكوى أو استفسار إضافي..."
                     className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm font-semibold text-slate-900 focus:border-amber-600 focus:outline-none transition"
                   ></textarea>
                 </div>
@@ -620,60 +519,8 @@ function SurveyFormContent() {
             </div>
           )}
 
-          {/* الخطوة 4: الشكوى المباشرة */}
+          {/* الخطوة 4: تأكيد النجاح */}
           {step === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-1">تقديم شكوى / ملاحظة</h2>
-                <p className="text-slate-600 text-sm">أهلاً بك {formData.fullName}، نرجو توضيح المشكلة لمتابعتها فوراً من قبل إدارة الشركة:</p>
-              </div>
-              
-              <div>
-                <textarea 
-                  className={`w-full border-2 rounded-2xl p-4 text-base font-semibold text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 h-40 transition ${
-                    errors.problemDetails ? "border-red-500" : "border-slate-300"
-                  }`}
-                  placeholder="اكتب تفاصيل المشكلة أو الملاحظة هنا (مثال: تأخير التسليم، خطأ في مقاسات القص...)"
-                  value={formData.problemDetails}
-                  onChange={(e) => {
-                    setFormData({...formData, problemDetails: e.target.value});
-                    if (errors.problemDetails) clearError("problemDetails");
-                  }}
-                ></textarea>
-                {errors.problemDetails && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.problemDetails}</p>}
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={submitComplaint}
-                  disabled={isSubmitting}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition shadow-md flex justify-center items-center gap-2 text-base disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>جاري الإرسال...</span>
-                    </>
-                  ) : (
-                    "إرسال الشكوى مباشرة"
-                  )}
-                </button>
-
-                <button
-                  onClick={handleBack}
-                  className="w-full border border-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition text-sm"
-                >
-                  ← رجوع
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* الخطوة 5: تأكيد النجاح */}
-          {step === 5 && (
             <div className="text-center space-y-6 py-6">
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -684,7 +531,7 @@ function SurveyFormContent() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-slate-900">شكراً لحسن تعاونكم!</h2>
                 <p className="text-slate-600 text-sm font-medium max-w-sm mx-auto leading-relaxed">
-                  تم استلام مشاركتكم بنجاح. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
+                  تم استلام مشاركتكم بنجاح في الإدارة الرئيسية. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
                 </p>
               </div>
 
@@ -697,7 +544,7 @@ function SurveyFormContent() {
                 </button>
               </div>
 
-              <p className="text-xs text-slate-400 pt-4 font-semibold">جميع الحقوق محفوظة © 2026 - شركة قرارة للرخــــــــام والجرانيت</p>
+              <p className="text-xs text-slate-400 pt-4 font-semibold">جميع الحقوق محفوظة © 2026 - شركة قرارة للرخــــــام والجرانيت</p>
             </div>
           )}
 
