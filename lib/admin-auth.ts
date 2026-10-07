@@ -1,0 +1,30 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export const ADMIN_SESSION_COOKIE = "admin_session";
+
+export function verifyAdminPassword(value: unknown): boolean {
+  const expected = process.env.ADMIN_PASSWORD;
+  if (typeof value !== "string" || !expected) return false;
+  const suppliedBuffer = Buffer.from(value, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  return suppliedBuffer.length === expectedBuffer.length && timingSafeEqual(suppliedBuffer, expectedBuffer);
+}
+
+export function createAdminSessionToken(): string | null {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret) return null;
+  const expiresAt = String(Math.floor(Date.now() / 1000) + 60 * 60 * 8);
+  const signature = createHmac("sha256", secret).update(expiresAt).digest("hex");
+  return expiresAt + "." + signature;
+}
+
+export function verifyAdminSession(token: string | undefined): boolean {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret || !token) return false;
+  const [expiresAt, signature, extra] = token.split(".");
+  if (!expiresAt || !signature || extra || !/^\d+$/.test(expiresAt)) return false;
+  if (Number(expiresAt) <= Math.floor(Date.now() / 1000) || !/^[a-f0-9]{64}$/.test(signature)) return false;
+  const expected = createHmac("sha256", secret).update(expiresAt).digest();
+  const supplied = Buffer.from(signature, "hex");
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}

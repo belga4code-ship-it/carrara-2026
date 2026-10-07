@@ -2,10 +2,11 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 
 interface FormDataState {
-  hasProblem: boolean | null;
+  hasProblem: boolean;
   problemDetails: string;
   fullName: string;
   phone: string;
@@ -25,7 +26,7 @@ interface FormDataState {
 }
 
 const initialFormData: FormDataState = {
-  hasProblem: null,
+  hasProblem: false,
   problemDetails: "",
   fullName: "",
   phone: "",
@@ -48,12 +49,13 @@ function SurveyFormContent() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string>("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const [formData, setFormData] = useState<FormDataState>(initialFormData);
 
-  // التاريخ الحالي تلقائياً بتنسيق YYYY-MM-DD
-  const currentDate = new Date().toISOString().split("T")[0];
+  // عرض التاريخ حسب التوقيت المحلي وبصيغة عربية
+  const currentDate = new Intl.DateTimeFormat("ar-LY", { dateStyle: "long" }).format(new Date());
 
   // قراءة الفرع ديناميكياً من رابط الـ QR إن وجد
   useEffect(() => {
@@ -80,8 +82,12 @@ function SurveyFormContent() {
 
   const validateStep1 = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!formData.fullName.trim()) newErrors.fullName = "يرجى إدخال الاسم الكامل";
-    if (!formData.phone.trim()) newErrors.phone = "يرجى إدخال رقم الهاتف";
+    const normalizedPhone = formData.phone
+      .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+      .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+    const phoneDigits = normalizedPhone.replace(/\D/g, "");
+    if (!phoneDigits) newErrors.phone = "يرجى إدخال رقم الهاتف";
+    else if (phoneDigits.length < 7 || phoneDigits.length > 15) newErrors.phone = "أدخل رقمًا صحيحًا من 7 إلى 15 رقمًا";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -90,6 +96,12 @@ function SurveyFormContent() {
   const validateSurvey = () => {
     const newErrors: { [key: string]: string } = {};
     if (!formData.visitorRole) newErrors.visitorRole = "يرجى تحديد صفة الزائر";
+    if (formData.visitorRole === "زائر مهتم / جهة أخرى" && !formData.visitorRoleOther.trim()) {
+      newErrors.visitorRoleOther = "يرجى تحديد صفتك";
+    }
+    if (formData.projectType === "أخرى" && !formData.projectTypeOther.trim()) {
+      newErrors.projectTypeOther = "يرجى تحديد نوع المشروع";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -104,23 +116,32 @@ function SurveyFormContent() {
   const submitSurvey = async () => {
     if (!validateSurvey()) return;
 
+    setSubmitError("");
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/survey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          phone: formData.phone
+            .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+            .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+            .trim(),
+          fullName: formData.fullName.trim(),
+        }),
       });
 
       if (response.ok) {
+        setSubmitError("");
         setStep(4); // الانتقال لصفحة الشكر والنجاح
       } else {
-        const errorData = await response.json();
-        alert(`حدث خطأ: ${errorData.error || "فشل إرسال البيانات"}`);
+        const errorData = await response.json().catch(() => null);
+        setSubmitError(errorData.error || "فشل إرسال البيانات. يرجى المحاولة مرة أخرى.");
       }
     } catch (error) {
       console.error("خطأ في الاتصال بالخادم:", error);
-      alert("تعذر الاتصال بالخادم، يرجى التأكد من الاتصال بالإنترنت.");
+      setSubmitError("تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.");
     } finally {
       setIsSubmitting(false);
     }
@@ -138,6 +159,7 @@ function SurveyFormContent() {
       branch: formData.branch,
     });
     setErrors({});
+    setSubmitError("");
     setStep(1);
   };
 
@@ -168,15 +190,10 @@ function SurveyFormContent() {
             <span>الإحصائيات</span>
           </Link>
 
-          {/* شعار الفيل والهوية البصرية */}
-          <div className="w-16 h-16 mx-auto mb-3 rounded-full p-0.5 bg-gradient-to-tr from-amber-500 to-amber-300 shadow-md flex items-center justify-center overflow-hidden">
-            <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center overflow-hidden">
-              <svg viewBox="0 0 24 24" className="w-10 h-10 text-amber-400 fill-current" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C9.5 2 7.5 3.5 6.8 5.6C5.1 6.2 4 7.8 4 9.7C4 11.2 4.8 12.5 6 13.3V18C6 19.1 6.9 20 8 20H9C10.1 20 11 19.1 11 18V17H13V18C13 19.1 13.9 20 15 20H16C17.1 20 18 19.1 18 18V13.3C19.2 12.5 20 11.2 20 9.7C20 7.8 18.9 6.2 17.2 5.6C16.5 3.5 14.5 2 12 2M12 4C13.7 4 15 5.3 15 7C15 8.7 13.7 10 12 10C10.3 10 9 8.7 9 7C9 5.3 10.3 4 12 4M7.5 14C8.3 14 9 13.3 9 12.5C9 11.7 8.3 11 7.5 11C6.7 11 6 11.7 6 12.5C6 13.3 6.7 14 7.5 14M16.5 14C17.3 14 18 13.3 18 12.5C18 11.7 17.3 11 16.5 11C15.7 11 15 11.7 15 12.5C15 13.3 15.7 14 16.5 14Z" />
-              </svg>
-            </div>
+          {/* شعار الشركة */}
+          <div className="mx-auto mb-3 h-20 w-20 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 p-1 shadow-lg">
+            <Image src="/carrara-elephant-logo.webp" alt="شعار شركة قرارة" width={512} height={512} priority className="h-full w-full rounded-full object-cover" />
           </div>
-
           <span className="text-amber-500 text-xs font-bold tracking-wider uppercase bg-amber-950/60 px-3 py-1 rounded-full border border-amber-600/30">
             تأسست 1991
           </span>
@@ -205,9 +222,9 @@ function SurveyFormContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">أهلاً بك في الإدارة الرئيسية</h2>
+                <h2 className="text-2xl font-bold text-slate-900">أهلاً بك في {formData.branch}</h2>
                 <p className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
-                  يرجى إدخال اسمك الكريم ورقم الهاتف للمتابعة إلى الاستبيان:
+                  رقم الهاتف مطلوب للتواصل معك، أما الاسم فيمكنك تركه فارغًا.
                 </p>
               </div>
 
@@ -219,7 +236,7 @@ function SurveyFormContent() {
               <div className="space-y-4 pt-2">
                 <div>
                   <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                    الاسم الكامل: <span className="text-red-500">*</span>
+                    الاسم (اختياري):
                   </label>
                   <input 
                     type="text"
@@ -228,7 +245,8 @@ function SurveyFormContent() {
                       setFormData({...formData, fullName: e.target.value});
                       if (errors.fullName) clearError("fullName");
                     }}
-                    placeholder="ادخل اسمك الكريم..."
+                    autoComplete="name"
+                    placeholder="اكتب اسمك إن رغبت"
                     className={`w-full border-2 rounded-xl p-3 text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-amber-600/20 focus:border-amber-600 focus:outline-none transition ${
                       errors.fullName ? "border-red-500" : "border-slate-300"
                     }`}
@@ -242,7 +260,11 @@ function SurveyFormContent() {
                   </label>
                   <input 
                     type="tel"
-                    placeholder="091XXXXXXX"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    dir="ltr"
+                    required
+                    placeholder="09XXXXXXXX أو +2189XXXXXXXX"
                     value={formData.phone}
                     onChange={(e) => {
                       setFormData({...formData, phone: e.target.value});
@@ -308,6 +330,7 @@ function SurveyFormContent() {
                           onChange={(e) => {
                             setFormData({...formData, visitorRole: e.target.value});
                             if (errors.visitorRole) clearError("visitorRole");
+                            if (errors.visitorRoleOther) clearError("visitorRoleOther");
                           }}
                           className="w-4 h-4 text-amber-600 focus:ring-amber-500" 
                         />
@@ -319,15 +342,33 @@ function SurveyFormContent() {
                         type="text"
                         placeholder="يرجى التحديد..."
                         value={formData.visitorRoleOther}
-                        onChange={(e) => setFormData({...formData, visitorRoleOther: e.target.value})}
+                        onChange={(e) => {
+                          setFormData({...formData, visitorRoleOther: e.target.value});
+                          if (errors.visitorRoleOther) clearError("visitorRoleOther");
+                        }}
                         className="w-full mt-2 border-2 border-slate-300 rounded-lg p-2.5 text-sm font-semibold text-slate-900 focus:border-amber-600 focus:outline-none"
                       />
                     )}
                   </div>
                   {errors.visitorRole && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.visitorRole}</p>}
+                  {errors.visitorRoleOther && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.visitorRoleOther}</p>}
                 </div>
               </div>
 
+              <div className="space-y-4 border-b border-slate-200 pb-6">
+                <h3 className="text-base font-black text-amber-700 flex items-center gap-2">
+                  <span className="w-3 h-3 bg-amber-600 rounded-full"></span>
+                  هل سبق لك التعامل مع الشركة؟
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {["نعم، سبق لي الشراء", "زرت المعرض من قبل", "هذه أول زيارة"].map((answer) => (
+                    <label key={answer} className="flex items-center gap-2 rounded-xl border-2 border-slate-200 p-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                      <input type="radio" name="previousDealing" value={answer} checked={formData.previousDealing === answer} onChange={(event) => setFormData({ ...formData, previousDealing: event.target.value })} className="h-4 w-4 text-amber-600" />
+                      <span>{answer}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
               {/* الاهتمامات والمشاريع */}
               <div className="space-y-4 border-b border-slate-200 pb-6">
                 <h3 className="text-base font-black text-amber-700 flex items-center gap-2">
@@ -337,15 +378,16 @@ function SurveyFormContent() {
 
                 <div>
                   <label className="block text-sm font-bold text-slate-900 mb-2">
-                    1. ما هي المنتجات التي أثارت اهتمامك؟
+                    1. ما المنتجات أو الخامات التي تبحث عنها؟ (يمكن اختيار أكثر من خيار)
                   </label>
                   <div className="space-y-2 text-sm">
                     {[
-                      "رخام محلي / مستورد (ألواح / بلاط)",
-                      "جرانيت بأنواعه المختلفة",
-                      "رخام للواجهات والتلبيس الخارجي",
-                      "مطابخ وأحواض",
-                      "أعمال قص وتفصيل خاصة (CNC)"
+                      "رخام طبيعي محلي أو مستورد",
+                      "جرانيت",
+                      "كوارتز وأسطح للمطابخ",
+                      "رخام وجرانيت للواجهات",
+                      "أحواض ودرج وديكورات",
+                      "قص وتفصيل حسب الطلب (CNC)"
                     ].map((product) => (
                       <label key={product} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
                         <input 
@@ -361,7 +403,7 @@ function SurveyFormContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-2">2. نوع المشروع:</label>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">2. لأي نوع مشروع تبحث عن المواد؟</label>
                   <div className="space-y-2 text-sm">
                     {["فيلا / منزل سكني خاص", "عمارة سكنية / تجارية", "فندق / منتجع", "مجمع تجاري / مكتب", "أخرى"].map((proj) => (
                       <label key={proj} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
@@ -370,7 +412,10 @@ function SurveyFormContent() {
                           name="projectType" 
                           value={proj} 
                           checked={formData.projectType === proj}
-                          onChange={(e) => setFormData({...formData, projectType: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, projectType: e.target.value});
+                            if (errors.projectTypeOther) clearError("projectTypeOther");
+                          }}
                           className="w-4 h-4 text-amber-600 focus:ring-amber-500" 
                         />
                         <span className="font-semibold text-slate-800">{proj}</span>
@@ -381,10 +426,14 @@ function SurveyFormContent() {
                         type="text"
                         placeholder="يرجى تحديد نوع المشروع..."
                         value={formData.projectTypeOther}
-                        onChange={(e) => setFormData({...formData, projectTypeOther: e.target.value})}
+                        onChange={(e) => {
+                          setFormData({...formData, projectTypeOther: e.target.value});
+                          if (errors.projectTypeOther) clearError("projectTypeOther");
+                        }}
                         className="w-full mt-2 border-2 border-slate-300 rounded-lg p-2.5 text-sm font-semibold text-slate-900 focus:border-amber-600 focus:outline-none"
                       />
                     )}
+                    {errors.projectTypeOther && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.projectTypeOther}</p>}
                   </div>
                 </div>
               </div>
@@ -397,9 +446,9 @@ function SurveyFormContent() {
                 </h3>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-2">1. تقييم جودة التشطيب والمعروضات:</label>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">1. ما مدى رضاك عن جودة المنتجات والتشطيب؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {["ممتاز", "جيد جداً", "متوسط", "بحاجة لتحسين"].map((q) => (
+                    {["ممتاز", "جيد جداً", "متوسط", "بحاجة لتحسين", "لم أتعامل مع المنتج بعد"].map((q) => (
                       <label 
                         key={q} 
                         className={`flex items-center gap-2 border-2 p-3 rounded-xl cursor-pointer transition font-semibold ${
@@ -423,7 +472,7 @@ function SurveyFormContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-2">2. تقييم تنوع المنتجات والخيارات المتاحة:</label>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">2. هل وجدت تنوعًا يناسب احتياجك؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {["ممتاز", "جيد جداً", "متوسط", "بحاجة لتحسين"].map((v) => (
                       <label 
@@ -449,9 +498,20 @@ function SurveyFormContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-2">3. تقييم الأسعار مقارنة بالجودة:</label>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">كيف تقيّم تعامل فريق المبيعات وسرعة الاستجابة؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {["مناسبة جداً", "معقولة", "مرتفعة نوعاً ما", "مرتفعة جداً"].map((p) => (
+                    {["ممتاز", "جيد جداً", "مقبول", "بحاجة إلى تحسين", "لم أتحدث مع فريق المبيعات"].map((rating) => (
+                      <label key={rating} className="flex items-center gap-2 rounded-xl border-2 border-slate-200 p-3 font-semibold text-slate-800 transition hover:bg-slate-50">
+                        <input type="radio" name="salesContact" value={rating} checked={formData.salesContact === rating} onChange={(event) => setFormData({ ...formData, salesContact: event.target.value })} className="h-4 w-4 text-amber-600" />
+                        <span>{rating}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">3. كيف ترى الأسعار مقارنة بالجودة؟</label>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {["مناسبة جداً", "مناسبة", "مرتفعة قليلاً", "مرتفعة جداً", "لم أتعرف على الأسعار بعد"].map((p) => (
                       <label 
                         key={p} 
                         className={`flex items-center gap-2 border-2 p-3 rounded-xl cursor-pointer transition font-semibold ${
@@ -483,12 +543,15 @@ function SurveyFormContent() {
                     rows={3}
                     value={formData.notes}
                     onChange={(e) => setFormData({...formData, notes: e.target.value, problemDetails: e.target.value})}
-                    placeholder="اكتب أي اقتراح أو شكوى أو استفسار إضافي..."
+                    placeholder="ما الذي أعجبك؟ وما الذي تقترح تحسينه؟"
                     className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm font-semibold text-slate-900 focus:border-amber-600 focus:outline-none transition"
                   ></textarea>
                 </div>
 
                 <div className="flex flex-col gap-3 mt-6">
+                  {submitError && (
+                    <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</p>
+                  )}
                   <button 
                     onClick={submitSurvey}
                     disabled={isSubmitting}
@@ -531,7 +594,7 @@ function SurveyFormContent() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-slate-900">شكراً لحسن تعاونكم!</h2>
                 <p className="text-slate-600 text-sm font-medium max-w-sm mx-auto leading-relaxed">
-                  تم استلام مشاركتكم بنجاح في الإدارة الرئيسية. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
+                  تم استلام مشاركتكم بنجاح في {formData.branch}. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
                 </p>
               </div>
 

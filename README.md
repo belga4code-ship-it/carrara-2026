@@ -20,6 +20,9 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## لوحة الإدارة
+
+تتطلب لوحة الإحصائيات كلمة مرور محفوظة على الخادم في المتغير `ADMIN_PASSWORD`. النسخة المحلية تستخدم `0000` داخل `.env.local`، وهذا الملف مستثنى من Git ولا ترفعه إلى المستودع. عند النشر، أضف `ADMIN_PASSWORD` و`ADMIN_SESSION_SECRET` إلى متغيرات بيئة الاستضافة، واختر كلمة مرور قوية ومفتاح جلسة عشوائيًا. تنتهي جلسة الدخول بعد 8 ساعات، ويمكن إنهاؤها بزر تسجيل الخروج.
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

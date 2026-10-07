@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+import Image from "next/image";
 
 interface ResponseItem {
   id: string;
@@ -28,19 +29,41 @@ interface ResponseItem {
 export default function AdminDashboard() {
   const [responses, setResponses] = useState<ResponseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<"analytics" | "complaints" | "all">("analytics");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<ResponseItem | null>(null);
 
   useEffect(() => {
-    fetchResponses();
+    fetch("/api/admin/auth")
+      .then(async (response) => {
+        if (response.ok) {
+          setAuthStatus("authenticated");
+          await fetchResponses();
+        } else {
+          setAuthStatus("unauthenticated");
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setAuthStatus("unauthenticated");
+        setLoading(false);
+      });
   }, []);
 
   const fetchResponses = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/responses");
+      if (res.status === 401) {
+        setAuthStatus("unauthenticated");
+        setResponses([]);
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setResponses(data.data || []);
@@ -52,6 +75,81 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError("");
+    setIsAuthenticating(true);
+    try {
+      const response = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAuthError(data.error || "تعذر تسجيل الدخول. حاول مرة أخرى.");
+        return;
+      }
+      setPassword("");
+      setAuthStatus("authenticated");
+      await fetchResponses();
+    } catch {
+      setAuthError("تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    setResponses([]);
+    setSelectedItem(null);
+    setAuthStatus("unauthenticated");
+  };
+
+  if (authStatus === "checking") {
+    return (
+      <main dir="rtl" className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <p role="status" className="font-semibold text-slate-300">جارٍ التحقق من تسجيل الدخول...</p>
+      </main>
+    );
+  }
+
+  if (authStatus === "unauthenticated") {
+    return (
+      <main dir="rtl" className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <section className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-7 shadow-2xl sm:p-9">
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl">🔒</div>
+            <h1 className="text-2xl font-black text-amber-400">دخول لوحة الإحصائيات</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-400">أدخل كلمة المرور للمتابعة إلى بيانات الزوار.</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <label htmlFor="admin-password" className="block text-sm font-bold text-slate-200">كلمة المرور</label>
+            <input
+              id="admin-password"
+              type="password"
+              inputMode="numeric"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-left text-lg tracking-[0.4em] text-white outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+              aria-describedby={authError ? "admin-auth-error" : undefined}
+            />
+            {authError && <p id="admin-auth-error" role="alert" className="rounded-xl border border-red-900 bg-red-950/50 px-4 py-3 text-sm font-semibold text-red-300">{authError}</p>}
+            <button
+              type="submit"
+              disabled={isAuthenticating || !password}
+              className="w-full rounded-xl bg-amber-600 py-3 font-bold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isAuthenticating ? "جارٍ التحقق..." : "دخول"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
   // --- دالة تصدير البيانات إلى Excel المعالجة والمحدثة ---
   const exportToExcel = () => {
     if (responses.length === 0) {
@@ -67,7 +165,9 @@ export default function AdminDashboard() {
       "رقم الهاتف",
       "البريد الإلكتروني",
       "صفة الزائر",
+      "تعامل سابق",
       "نوع المشروع",
+      "تقييم فريق المبيعات",
       "رقم الفاتورة",
       "الفرع",
       "تفاصيل الشكوى / الملاحظة",
@@ -95,7 +195,9 @@ export default function AdminDashboard() {
       cleanCell(item.phone),
       cleanCell(item.email || "-"),
       cleanCell(item.visitor_role || "-"),
+      cleanCell(item.previous_dealing || "-"),
       cleanCell(item.project_type || "-"),
+      cleanCell(item.sales_contact || "-"),
       cleanCell(item.invoice_no || "-"),
       cleanCell(item.branch || "-"),
       cleanCell(item.problem_details || "-"),
@@ -227,6 +329,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-6 gap-4">
           <div>
             <div className="flex items-center gap-3">
+              <Image src="/carrara-elephant-logo.webp" alt="شعار شركة قرارة" width={56} height={56} className="h-14 w-14 shrink-0 rounded-full border border-amber-500/50 bg-white object-cover" />
               <h1 className="text-2xl sm:text-3xl font-black text-amber-500">لوحة تحليل البيانات والإحصائيات</h1>
               <span className="bg-amber-950/80 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-800/40">
                 شركة قرارة للرخام والجرانيت
@@ -236,6 +339,12 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={handleLogout}
+              className="bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl border border-slate-800 text-sm font-semibold transition"
+            >
+              تسجيل الخروج
+            </button>
             <button
               onClick={exportToExcel}
               className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-emerald-600/20"
@@ -563,6 +672,8 @@ export default function AdminDashboard() {
                   <div><span className="text-slate-500">الاسم: </span><span className="font-bold text-white">{selectedItem.full_name}</span></div>
                   <div><span className="text-slate-500">الهاتف: </span><span className="font-mono text-amber-400">{selectedItem.phone}</span></div>
                   <div><span className="text-slate-500">الصفة: </span><span className="text-slate-300">{selectedItem.visitor_role || "غير محدد"}</span></div>
+                  <div><span className="text-slate-500">تعامل سابق: </span><span className="text-slate-300">{selectedItem.previous_dealing || "غير محدد"}</span></div>
+                  <div><span className="text-slate-500">تقييم المبيعات: </span><span className="text-slate-300">{selectedItem.sales_contact || "غير محدد"}</span></div>
                   <div><span className="text-slate-500">نوع المشروع: </span><span className="text-slate-300">{selectedItem.project_type || "غير محدد"}</span></div>
                   <div><span className="text-slate-500">الفاتورة: </span><span className="font-mono text-slate-300">{selectedItem.invoice_no || "-"}</span></div>
                   <div><span className="text-slate-500">الفرع: </span><span className="text-slate-300">{selectedItem.branch || "-"}</span></div>

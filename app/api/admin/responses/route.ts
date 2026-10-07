@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
@@ -9,7 +10,14 @@ const supabaseKey =
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)) {
+    return NextResponse.json(
+      { success: false, error: "يلزم تسجيل الدخول لعرض البيانات" },
+      { status: 401, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
   try {
     if (!supabase) {
       return NextResponse.json(
@@ -24,8 +32,11 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
+      const message = /invalid api key/i.test(error.message)
+        ? "مفتاح Supabase الخاص بلوحة الإدارة غير صالح. حدّث SUPABASE_SERVICE_ROLE_KEY من إعدادات المشروع الصحيح."
+        : error.message;
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: message },
         { status: 500 }
       );
     }
