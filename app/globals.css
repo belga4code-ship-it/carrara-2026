@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #f4f4f5;
 }
 
 @theme inline {
@@ -23,4 +23,86 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.survey-page {
+  background:
+    radial-gradient(ellipse 40% 24% at 50% 8%, rgb(210 181 95 / 35%), transparent 100%),
+    radial-gradient(ellipse 55% 42% at 50% 100%, rgb(146 117 42 / 11%), transparent 100%),
+    linear-gradient(145deg, #1d1d1a 0%, #111110 48%, #080808 100%);
+}
+
+.survey-card {
+  color: #211f1a;
+  background: #fffdf7 !important;
+  border-color: #b89a38 !important;
+  box-shadow: 0 24px 90px rgb(0 0 0 / 48%), 0 0 0 5px rgb(187 154 49 / 10%);
+}
+
+.survey-card [class*="bg-slate-950"],
+.survey-card [class*="bg-slate-900"],
+.survey-card [class*="bg-slate-800"] {
+  background-color: #fffefa !important;
+}
+
+.survey-card [class*="bg-yellow-950"] {
+  background-color: #f5ebc9 !important;
+}
+
+.survey-card [class*="text-slate-100"],
+.survey-card [class*="text-slate-200"],
+.survey-card [class*="text-slate-300"],
+.survey-card [class*="text-white"] {
+  color: #28261f !important;
+}
+
+.survey-card [class*="text-slate-400"] {
+  color: #777266 !important;
+}
+
+.survey-card [class*="text-slate-500"] {
+  color: #817b6b !important;
+}
+
+.survey-card [class*="text-yellow-100"],
+.survey-card [class*="text-yellow-200"],
+.survey-card [class*="text-yellow-300"] {
+  color: #69551a !important;
+}
+
+.survey-card [class*="border-slate-"] {
+  border-color: #e7e1d2 !important;
+}
+
+.survey-card input:not([type="checkbox"]):not([type="radio"]),
+.survey-card textarea {
+  color: #211f1a;
+  background-color: #fffefa !important;
+  border-color: #e5dfd0 !important;
+}
+
+.survey-card input::placeholder,
+.survey-card textarea::placeholder {
+  color: #9a9588;
+}
+
+.survey-card button[class*="bg-yellow-400"] {
+  color: #201b0c !important;
+  background: linear-gradient(100deg, #b79a3b, #d2b653) !important;
+  box-shadow: 0 8px 18px rgb(166 133 35 / 18%);
+}
+
+.survey-card button[class*="bg-yellow-400"]:hover {
+  background: linear-gradient(100deg, #c8aa45, #dfc468) !important;
+}
+
+@media (max-width: 640px) {
+  .survey-page {
+    align-items: flex-start;
+    padding: 18px 14px 30px;
+  }
+
+  .survey-card {
+    border-radius: 26px;
+  }
 }

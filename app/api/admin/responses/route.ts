@@ -9,6 +9,11 @@ const supabaseKey =
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabaseStorageAdmin =
+  supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    : null;
+const REFERENCE_BUCKET = "survey-reference-images";
 
 export async function GET(request: NextRequest) {
   if (!verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)) {
@@ -41,8 +46,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, data }, { status: 200 });
-  } catch (err: any) {
+    const dataWithAttachments = await Promise.all((data ?? []).map(async (item) => {
+      const match = typeof item.notes === "string"
+        ? item.notes.match(/صورة مرجعية مرفقة: ([a-f0-9-]+\.(?:jpg|png|webp))/i)
+        : null;
+      if (!match || !supabaseStorageAdmin) return { ...item, attachment_url: null };
+      const { data: signed, error: signedUrlError } = await supabaseStorageAdmin.storage
+        .from(REFERENCE_BUCKET)
+        .createSignedUrl(match[1], 60 * 10);
+      return { ...item, attachment_url: signedUrlError ? null : signed.signedUrl };
+    }));
+
+    return NextResponse.json({ success: true, data: dataWithAttachments }, { status: 200 });
+  } catch {
     return NextResponse.json(
       { success: false, error: "Server Error" },
       { status: 500 }

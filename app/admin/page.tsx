@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 
 interface ResponseItem {
@@ -24,6 +24,7 @@ interface ResponseItem {
   branch: string | null;
   invoice_no: string | null;
   notes: string | null;
+  attachment_url?: string | null;
 }
 
 export default function AdminDashboard() {
@@ -37,6 +38,24 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<ResponseItem | null>(null);
+
+  const fetchResponses = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/responses");
+      if (res.status === 401) {
+        setAuthStatus("unauthenticated");
+        setResponses([]);
+        return;
+      }
+      const data = await res.json();
+      if (data.success) setResponses(data.data || []);
+    } catch (err) {
+      console.error("فشل في جلب البيانات", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/auth")
@@ -53,27 +72,7 @@ export default function AdminDashboard() {
         setAuthStatus("unauthenticated");
         setLoading(false);
       });
-  }, []);
-
-  const fetchResponses = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/responses");
-      if (res.status === 401) {
-        setAuthStatus("unauthenticated");
-        setResponses([]);
-        return;
-      }
-      const data = await res.json();
-      if (data.success) {
-        setResponses(data.data || []);
-      }
-    } catch (err) {
-      console.error("فشل في جلب البيانات", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchResponses]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -179,9 +178,9 @@ export default function AdminDashboard() {
     ];
 
     // تنظيف النصوص لمنع انكسار أسطر Excel
-    const cleanCell = (val: any) => {
+    const cleanCell = (val: unknown) => {
       if (val === null || val === undefined) return '""';
-      let str = String(val)
+      const str = String(val)
         .replace(/"/g, '""')       // مضاعفة علامات التنصيص
         .replace(/[\r\n]+/g, " "); // استبدال الأسطر الجديدة بمسافات
       return `"${str}"`;
@@ -726,6 +725,11 @@ export default function AdminDashboard() {
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
                   <h3 className="text-xs font-extrabold text-slate-400 uppercase">ملاحظات إضافية:</h3>
                   <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{selectedItem.notes}</p>
+                  {selectedItem.attachment_url && (
+                    <a href={selectedItem.attachment_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-300">
+                      فتح الصورة المرجعية
+                    </a>
+                  )}
                 </div>
               )}
 
