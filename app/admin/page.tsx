@@ -30,6 +30,7 @@ interface ResponseItem {
 export default function AdminDashboard() {
   const [responses, setResponses] = useState<ResponseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [filterReferenceTime] = useState(() => Date.now());
   const [responsesError, setResponsesError] = useState("");
   const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
   const [password, setPassword] = useState("");
@@ -38,6 +39,10 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"analytics" | "complaints" | "all">("analytics");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<"all" | "7" | "30">("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [selectedItem, setSelectedItem] = useState<ResponseItem | null>(null);
 
   const fetchResponses = useCallback(async () => {
@@ -159,7 +164,7 @@ export default function AdminDashboard() {
   }
   // --- دالة تصدير البيانات إلى Excel المعالجة والمحدثة ---
   const exportToExcel = () => {
-    if (responses.length === 0) {
+    if (filteredResponses.length === 0) {
       alert("لا توجد بيانات متاحة للتصدير حالياً.");
       return;
     }
@@ -194,7 +199,7 @@ export default function AdminDashboard() {
       return `"${str}"`;
     };
 
-    const rows = responses.map((item) => [
+    const rows = filteredResponses.map((item) => [
       cleanCell(item.id),
       cleanCell(new Date(item.created_at).toLocaleString("ar-LY")),
       cleanCell(item.has_problem ? "شكوى" : "استبيان"),
@@ -252,21 +257,33 @@ export default function AdminDashboard() {
   };
 
   // --- حسابات الإحصائيات والنسب المئوية ---
-  const totalCount = responses.length;
-  const totalComplaints = responses.filter((r) => r.has_problem).length;
-  const totalSurveys = totalCount - totalComplaints;
-  
-  const satisfactionRate = totalCount > 0 
-    ? Math.round((totalSurveys / totalCount) * 100) 
-    : 0;
-
   const branches = Array.from(new Set(responses.map((r) => r.branch).filter(Boolean))) as string[];
+  const roles = Array.from(new Set(responses.map((r) => r.visitor_role).filter(Boolean))) as string[];
+  const projects = Array.from(new Set(responses.map((r) => r.project_type).filter(Boolean))) as string[];
+  const filteredResponses = responses
+    .filter((item) => {
+      const matchesTab = activeTab !== "complaints" || item.has_problem;
+      const query = searchTerm.trim().toLocaleLowerCase("ar");
+      const matchesSearch = !query || [item.full_name, item.phone, item.invoice_no, item.branch]
+        .some((value) => value?.toLocaleLowerCase("ar").includes(query));
+      const matchesDate = periodFilter === "all" || filterReferenceTime - new Date(item.created_at).getTime() <= Number(periodFilter) * 24 * 60 * 60 * 1000;
+      return matchesTab && matchesSearch && matchesDate &&
+        (branchFilter === "all" || item.branch === branchFilter) &&
+        (roleFilter === "all" || item.visitor_role === roleFilter) &&
+        (projectFilter === "all" || item.project_type === projectFilter);
+    })
+    .sort((a, b) => (sortOrder === "newest" ? 1 : -1) * (new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+
+  const totalCount = filteredResponses.length;
+  const totalComplaints = filteredResponses.filter((r) => r.has_problem).length;
+  const totalSurveys = totalCount - totalComplaints;
+  const surveyShare = totalCount > 0 ? Math.round((totalSurveys / totalCount) * 100) : 0;
 
   const getDistribution = (key: keyof ResponseItem) => {
     const counts: { [key: string]: number } = {};
     let totalValid = 0;
 
-    responses.forEach((r) => {
+    filteredResponses.forEach((r) => {
       const val = r[key];
       if (val && typeof val === "string") {
         counts[val] = (counts[val] || 0) + 1;
@@ -287,7 +304,7 @@ export default function AdminDashboard() {
     const counts: { [key: string]: number } = {};
     let totalInterestsCount = 0;
 
-    responses.forEach((r) => {
+    filteredResponses.forEach((r) => {
       if (Array.isArray(r.interests)) {
         r.interests.forEach((item) => {
           counts[item] = (counts[item] || 0) + 1;
@@ -305,31 +322,53 @@ export default function AdminDashboard() {
       .sort((a, b) => b.count - a.count);
   };
 
+  const getNotesDistribution = (prefix: string) => {
+    const counts: Record<string, number> = {};
+    filteredResponses.forEach((item) => {
+      const line = item.notes?.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
+      const value = line?.slice(prefix.length).trim();
+      if (value) counts[value] = (counts[value] || 0) + 1;
+    });
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count, percentage: total ? Math.round((count / total) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+  };
+
   const qualityStats = getDistribution("quality_rating");
+  const varietyStats = getDistribution("variety_rating");
   const priceStats = getDistribution("price_rating");
+  const salesStats = getDistribution("sales_contact");
   const roleStats = getDistribution("visitor_role");
+  const projectStats = getDistribution("project_type");
+  const dealingStats = getDistribution("previous_dealing");
+  const branchStats = getDistribution("branch");
   const interestStats = getInterestsDistribution();
+  const exhibitionStats = getNotesDistribution("تقييم تجربة جناح المعرض:");
+  const analyticsCards = [
+    { title: "جودة المنتجات والتشطيب", icon: "✦", stats: qualityStats },
+    { title: "توفر الخيارات المناسبة", icon: "✓", stats: varietyStats },
+    { title: "تجربة فريق المبيعات", icon: "◉", stats: salesStats },
+    { title: "تقييم الأسعار", icon: "د.ل", stats: priceStats },
+    { title: "تجربة جناح المعرض", icon: "⌂", stats: exhibitionStats },
+    { title: "صفة الزوار", icon: "♙", stats: roleStats },
+    { title: "نوع المشروع", icon: "▦", stats: projectStats },
+    { title: "التعامل السابق", icon: "↗", stats: dealingStats },
+    { title: "الفروع", icon: "⌖", stats: branchStats },
+    { title: "المنتجات الأكثر اهتمامًا", icon: "◇", stats: interestStats },
+  ];
 
-  const filteredResponses = responses.filter((item) => {
-    const matchesTab =
-      activeTab === "all"
-        ? true
-        : activeTab === "complaints"
-        ? item.has_problem
-        : true;
-
-    const matchesBranch = branchFilter === "all" || item.branch === branchFilter;
-
-    const matchesSearch =
-      (item.full_name && item.full_name.includes(searchTerm)) ||
-      (item.phone && item.phone.includes(searchTerm)) ||
-      (item.invoice_no && item.invoice_no.includes(searchTerm));
-
-    return matchesTab && matchesBranch && matchesSearch;
-  });
+  const exportToPdf = () => {
+    if (responses.length === 0) {
+      alert("لا توجد بيانات متاحة لإعداد التقرير حالياً.");
+      return;
+    }
+    window.print();
+  };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 font-sans">
+    <>
+    <div dir="rtl" className="admin-screen min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* الهيدر العلوي */}
@@ -346,6 +385,12 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={exportToPdf}
+              className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-4 py-2.5 rounded-xl text-sm font-black transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
+            >
+              📄 تصدير التقرير PDF
+            </button>
             <button
               onClick={handleLogout}
               className="bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl border border-slate-800 text-sm font-semibold transition"
@@ -375,29 +420,26 @@ export default function AdminDashboard() {
         )}
 
         {/* كروت المؤشرات الرئيسية (KPIs) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-lg">
-            <span className="text-slate-400 text-xs font-bold block mb-1">إجمالي المشاركات</span>
-            <div className="text-3xl font-black text-white">{totalCount}</div>
-            <span className="text-xs text-slate-500 mt-1 block">استبيان وشكوى مسجلة</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="dashboard-kpi border-amber-500/30">
+            <span>إجمالي المشاركات</span>
+            <strong>{totalCount}</strong>
+            <small>استبيانات وشكاوى مسجلة</small>
           </div>
-
-          <div className="bg-emerald-950/30 border border-emerald-900/40 p-5 rounded-2xl shadow-lg">
-            <span className="text-emerald-400 text-xs font-bold block mb-1">نسبة الرضا العامة</span>
-            <div className="text-3xl font-black text-emerald-400">{satisfactionRate}%</div>
-            <span className="text-xs text-emerald-400/60 mt-1 block">تقييمات إيجابية دون شكاوى</span>
+          <div className="dashboard-kpi border-emerald-500/30">
+            <span>الاستبيانات المكتملة</span>
+            <strong className="text-emerald-400">{totalSurveys}</strong>
+            <small>مشاركة تضمنت تقييمًا للمعرض</small>
           </div>
-
-          <div className="bg-red-950/30 border border-red-900/40 p-5 rounded-2xl shadow-lg">
-            <span className="text-red-400 text-xs font-bold block mb-1">الشكاوى والملاحظات</span>
-            <div className="text-3xl font-black text-red-400">{totalComplaints}</div>
-            <span className="text-xs text-red-400/60 mt-1 block">تستوجب التدخل والتواصل</span>
+          <div className="dashboard-kpi border-red-500/30">
+            <span>الشكاوى</span>
+            <strong className="text-red-400">{totalComplaints}</strong>
+            <small>تحتاج إلى المتابعة</small>
           </div>
-
-          <div className="bg-sky-950/30 border border-sky-900/40 p-5 rounded-2xl shadow-lg">
-            <span className="text-sky-400 text-xs font-bold block mb-1">الاستبيانات المكتملة</span>
-            <div className="text-3xl font-black text-sky-400">{totalSurveys}</div>
-            <span className="text-xs text-sky-400/60 mt-1 block">استبيان شامل البيانات</span>
+          <div className="dashboard-kpi border-sky-500/30">
+            <span>نسبة الاستبيانات</span>
+            <strong className="text-sky-400">{surveyShare}%</strong>
+            <small>من إجمالي المشاركات</small>
           </div>
         </div>
 
@@ -429,98 +471,54 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        <div className="dashboard-filters rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+          <input type="text" placeholder="ابحث بالاسم أو الهاتف أو الفاتورة أو الفرع..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="dashboard-filter-input" />
+          <select aria-label="تصفية حسب الفرع" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="dashboard-filter-input">
+            <option value="all">جميع الفروع</option>{branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}
+          </select>
+          <select aria-label="تصفية حسب صفة الزائر" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="dashboard-filter-input">
+            <option value="all">كل صفات الزوار</option>{roles.map((role) => <option key={role} value={role}>{role}</option>)}
+          </select>
+          <select aria-label="تصفية حسب نوع المشروع" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="dashboard-filter-input">
+            <option value="all">كل أنواع المشاريع</option>{projects.map((project) => <option key={project} value={project}>{project}</option>)}
+          </select>
+          <select aria-label="تصفية حسب الفترة" value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value as "all" | "7" | "30")} className="dashboard-filter-input">
+            <option value="all">كل الفترات</option><option value="7">آخر 7 أيام</option><option value="30">آخر 30 يومًا</option>
+          </select>
+          <select aria-label="ترتيب الردود" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")} className="dashboard-filter-input">
+            <option value="newest">الأحدث أولًا</option><option value="oldest">الأقدم أولًا</option>
+          </select>
+          <div className="dashboard-filter-summary">
+            <span>النتائج المعروضة</span><strong>{filteredResponses.length} <small>من {responses.length}</small></strong>
+            <button type="button" onClick={() => { setSearchTerm(""); setBranchFilter("all"); setRoleFilter("all"); setProjectFilter("all"); setPeriodFilter("all"); setSortOrder("newest"); }}>مسح الفلاتر</button>
+          </div>
+        </div>
+
         {/* قسم 1: لوحة التحليلات والرسومات البيانية */}
         {activeTab === "analytics" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
-            {/* 1. تقييم جودة التشطيب والمعروضات */}
-            <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center gap-2">
-                <span>⭐</span> جودة التشطيب
-              </h3>
-              {qualityStats.length === 0 ? (
-                <p className="text-slate-500 text-xs py-4 text-center">لا توجد بيانات مسجلة بعد.</p>
-              ) : (
-                qualityStats.map((st) => (
-                  <div key={st.name} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-300">{st.name}</span>
-                      <span className="text-amber-400">{st.percentage}% ({st.count})</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${st.percentage}%` }}></div>
-                    </div>
+          <div className="dashboard-chart-grid">
+            {analyticsCards.map((card) => (
+              <section key={card.title} className="dashboard-chart-card">
+                <h3><span aria-hidden="true">{card.icon}</span>{card.title}</h3>
+                {card.stats.length === 0 ? (
+                  <p className="dashboard-empty">لا توجد بيانات كافية لهذا المؤشر.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {card.stats.map((stat) => (
+                      <div key={stat.name}>
+                        <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                          <span className="min-w-0 truncate font-semibold text-slate-200">{stat.name}</span>
+                          <span className="shrink-0 font-bold text-amber-300">{stat.count} <span className="text-slate-500">({stat.percentage}%)</span></span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-800" role="img" aria-label={`${stat.name}: ${stat.count}، ${stat.percentage}%`}>
+                          <div className="h-full rounded-full bg-gradient-to-l from-amber-300 to-amber-600 transition-all duration-500" style={{ width: `${stat.percentage}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* 2. تقييم الأسعار */}
-            <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center gap-2">
-                <span>💰</span> ملاءمة الأسعار
-              </h3>
-              {priceStats.length === 0 ? (
-                <p className="text-slate-500 text-xs py-4 text-center">لا توجد بيانات مسجلة بعد.</p>
-              ) : (
-                priceStats.map((st) => (
-                  <div key={st.name} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-300">{st.name}</span>
-                      <span className="text-amber-400">{st.percentage}% ({st.count})</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${st.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* 3. المنتجات الأكثر طلباً واهتماماً */}
-            <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-sm font-bold text-emerald-400 border-b border-slate-800 pb-3 flex items-center gap-2">
-                <span>🏛️</span> المنتجات الأكثر اهتماماً
-              </h3>
-              {interestStats.length === 0 ? (
-                <p className="text-slate-500 text-xs py-4 text-center">لا توجد بيانات كافية.</p>
-              ) : (
-                interestStats.map((st) => (
-                  <div key={st.name} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-300 truncate max-w-[150px]">{st.name}</span>
-                      <span className="text-emerald-400">{st.count} زائر</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${st.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* 4. توزيع صفات الزوار */}
-            <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-sm font-bold text-sky-400 border-b border-slate-800 pb-3 flex items-center gap-2">
-                <span>👷‍♂️</span> صفة الزوار
-              </h3>
-              {roleStats.length === 0 ? (
-                <p className="text-slate-500 text-xs py-4 text-center">لا توجد بيانات كافية.</p>
-              ) : (
-                roleStats.map((st) => (
-                  <div key={st.name} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-300 truncate max-w-[150px]">{st.name}</span>
-                      <span className="text-sky-400">{st.percentage}% ({st.count})</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-sky-500 h-2 rounded-full transition-all duration-500" style={{ width: `${st.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
+                )}
+              </section>
+            ))}
           </div>
         )}
 
@@ -528,32 +526,6 @@ export default function AdminDashboard() {
         {(activeTab === "complaints" || activeTab === "all") && (
           <div className="space-y-4">
             
-            {/* أدوات البحث والفلترة */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-              <input
-                type="text"
-                placeholder="بحث باسم الزائر، رقم الهاتف، أو رقم الفاتورة..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-96 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
-              />
-
-              {/* فلتر الفروع */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-400 font-bold whitespace-nowrap">الفرع:</span>
-                <select
-                  value={branchFilter}
-                  onChange={(e) => setBranchFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500 w-full sm:w-auto"
-                >
-                  <option value="all">جميع الفروع</option>
-                  {branches.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             {/* الجدول */}
             {loading ? (
               <div className="text-center py-12 text-slate-500 font-bold">جاري تحميل البيانات...</div>
@@ -770,5 +742,49 @@ export default function AdminDashboard() {
 
       </div>
     </div>
+    <section dir="rtl" className="admin-print-report">
+      <header className="report-header">
+        <Image src="/carrara-elephant-logo.webp" alt="شعار شركة قرارة" width={64} height={64} />
+        <div>
+          <h1>تقرير استبيان زوار شركة قرارة</h1>
+          <p>شركة قرارة للرخام والجرانيت</p>
+        </div>
+        <div className="report-meta">
+          <span>تاريخ التقرير</span>
+          <strong>{new Intl.DateTimeFormat("ar-LY", { dateStyle: "long" }).format(new Date())}</strong>
+          <span>النطاق: {branchFilter === "all" ? "جميع الفروع" : branchFilter}</span>
+        </div>
+      </header>
+
+      <div className="report-kpis">
+        <div><span>إجمالي المشاركات</span><strong>{totalCount}</strong></div>
+        <div><span>الاستبيانات</span><strong>{totalSurveys}</strong></div>
+        <div><span>الشكاوى</span><strong>{totalComplaints}</strong></div>
+        <div><span>نسبة الاستبيانات</span><strong>{surveyShare}%</strong></div>
+      </div>
+
+      <h2 className="report-section-title">تفاصيل المؤشرات</h2>
+      <div className="report-charts">
+        {analyticsCards.map((card) => (
+          <section key={card.title} className="report-chart-card">
+            <h3>{card.title}</h3>
+            {card.stats.length === 0 ? (
+              <p>لا توجد بيانات كافية.</p>
+            ) : (
+              <ul>
+                {card.stats.map((stat) => (
+                  <li key={stat.name}>
+                    <span>{stat.name}</span>
+                    <strong>{stat.count} ({stat.percentage}%)</strong>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
+      </div>
+      <footer className="report-footer">يعرض هذا التقرير مؤشرات مجمعة لردود الزوار دون إظهار بيانات الاتصال الشخصية.</footer>
+    </section>
+    </>
   );
 }
