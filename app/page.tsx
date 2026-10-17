@@ -492,7 +492,7 @@ function SurveyFormContent() {
                 {formData.previousDealing === "نعم، سبق لي الشراء" && <div>
                   <label className="block text-sm font-bold text-slate-100 mb-2">1. ما مدى رضاك عن جودة المنتجات ومستوى التشطيب؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {["جيد", "متوسط", "بحاجة إلى تحسين"].map((q) => (
+                    {["ممتاز", "جيد جداً", "متوسط", "بحاجة إلى تحسين"].map((q) => (
                       <label
                         key={q}
                         className={`flex items-center gap-2 border-2 p-3 rounded-xl cursor-pointer transition font-semibold ${
@@ -516,9 +516,9 @@ function SurveyFormContent() {
                 </div>}
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-100 mb-2">2. هل وجدت نوعًا يناسب احتياجك؟</label>
+                  <label className="block text-sm font-bold text-slate-100 mb-2">2. هل وجدت خيارات تناسب احتياجاتك؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {["ممتاز", "متوسط", "بحاجة إلى تحسين", "بحاجة إلى إضافة خيارات"].map((v) => (
+                    {["نعم", "لا"].map((v) => (
                       <label
                         key={v}
                         className={`flex items-center gap-2 border-2 p-3 rounded-xl cursor-pointer transition font-semibold ${
@@ -532,17 +532,17 @@ function SurveyFormContent() {
                           name="varietyRating"
                           value={v}
                           checked={formData.varietyRating === v}
-                          onChange={(e) => setFormData({ ...formData, varietyRating: e.target.value, varietyDetails: e.target.value.includes("بحاجة") ? formData.varietyDetails : "" })}
+                          onChange={(e) => setFormData({ ...formData, varietyRating: e.target.value, varietyDetails: e.target.value === "لا" ? formData.varietyDetails : "" })}
                           className="w-4 h-4 text-yellow-400"
                         />
                         <span>{v}</span>
                       </label>
                     ))}
                   </div>
-                  {["بحاجة إلى تحسين", "بحاجة إلى إضافة خيارات"].includes(formData.varietyRating) && (
+                  {formData.varietyRating === "لا" && (
                     <div className="mt-3">
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">هل يمكنك التحديد؟ <span className="font-normal text-slate-400">(اختياري)</span></label>
-                      <textarea rows={2} value={formData.varietyDetails} onChange={(event) => setFormData({ ...formData, varietyDetails: event.target.value })} placeholder="ما النوع أو الخيارات التي كنت تبحث عنها؟" className="w-full rounded-xl border-2 border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none" />
+                      <label className="mb-1 block text-xs font-semibold text-slate-300">ما أنواع أو خيارات الخامات التي كنت تبحث عنها؟ <span className="font-normal text-slate-400">(اختياري)</span></label>
+                      <textarea rows={2} value={formData.varietyDetails} onChange={(event) => setFormData({ ...formData, varietyDetails: event.target.value })} placeholder="اكتب الأنواع أو الخيارات التي تقترح إضافتها." className="w-full rounded-xl border-2 border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none" />
                     </div>
                   )}
                 </div>
