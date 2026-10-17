@@ -8,7 +8,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
   supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 const REFERENCE_BUCKET = "survey-reference-images";
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     if (referenceImage) {
       if (!supabaseAdmin) {
         return NextResponse.json(
-          { success: false, error: "رفع الصور يحتاج إعداد مفتاح SUPABASE_SERVICE_ROLE_KEY على الخادم" },
+          { success: false, error: "رفع الصور يحتاج إعداد SUPABASE_SECRET_KEY أو SUPABASE_SERVICE_ROLE_KEY على الخادم" },
           { status: 503 }
         );
       }

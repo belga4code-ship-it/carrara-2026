@@ -4,14 +4,15 @@ import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
+  process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 const supabaseStorageAdmin =
-  supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  supabaseUrl && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ? createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!)
     : null;
 const REFERENCE_BUCKET = "survey-reference-images";
 
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       const message = /invalid api key/i.test(error.message)
-        ? "مفتاح Supabase الخاص بلوحة الإدارة غير صالح. حدّث SUPABASE_SERVICE_ROLE_KEY من إعدادات المشروع الصحيح."
+        ? "مفتاح Supabase الخاص بلوحة الإدارة غير صالح. حدّث SUPABASE_SECRET_KEY أو SUPABASE_SERVICE_ROLE_KEY من إعدادات المشروع الصحيح."
         : error.message;
       return NextResponse.json(
         { success: false, error: message },
