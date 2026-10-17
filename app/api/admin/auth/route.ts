@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
+  hasAdminAuthConfig,
   verifyAdminPassword,
   verifyAdminSession,
 } from "@/lib/admin-auth";
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_SECRET) {
+  if (!hasAdminAuthConfig()) {
     return NextResponse.json(
       { error: "إعدادات دخول لوحة الإدارة غير مكتملة على الخادم" },
       { status: 503 }

@@ -2,8 +2,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const ADMIN_SESSION_COOKIE = "admin_session";
 
+function readServerEnv(name: string): string | undefined {
+  // Keep server secrets as runtime reads so the Next.js build doesn't inline them.
+  return process.env[name];
+}
+
+export function hasAdminAuthConfig(): boolean {
+  return Boolean(readServerEnv("ADMIN_PASSWORD") && readServerEnv("ADMIN_SESSION_SECRET"));
+}
+
 export function verifyAdminPassword(value: unknown): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
+  const expected = readServerEnv("ADMIN_PASSWORD");
   if (typeof value !== "string" || !expected) return false;
   const suppliedBuffer = Buffer.from(value, "utf8");
   const expectedBuffer = Buffer.from(expected, "utf8");
@@ -11,7 +20,7 @@ export function verifyAdminPassword(value: unknown): boolean {
 }
 
 export function createAdminSessionToken(): string | null {
-  const secret = process.env.ADMIN_SESSION_SECRET;
+  const secret = readServerEnv("ADMIN_SESSION_SECRET");
   if (!secret) return null;
   const expiresAt = String(Math.floor(Date.now() / 1000) + 60 * 60 * 8);
   const signature = createHmac("sha256", secret).update(expiresAt).digest("hex");
@@ -19,7 +28,7 @@ export function createAdminSessionToken(): string | null {
 }
 
 export function verifyAdminSession(token: string | undefined): boolean {
-  const secret = process.env.ADMIN_SESSION_SECRET;
+  const secret = readServerEnv("ADMIN_SESSION_SECRET");
   if (!secret || !token) return false;
   const [expiresAt, signature, extra] = token.split(".");
   if (!expiresAt || !signature || extra || !/^\d+$/.test(expiresAt)) return false;
