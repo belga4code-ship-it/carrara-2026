@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#171613"/>
+  <rect x="18" y="18" width="476" height="476" rx="98" fill="none" stroke="#c6a33a" stroke-width="12"/>
+  <circle cx="256" cy="215" r="119" fill="#f7f3e8" stroke="#c6a33a" stroke-width="12"/>
+  <path d="M187 220c0-39 28-67 69-67s69 28 69 67v30c0 20-13 34-31 34-15 0-25-10-25-25v-11h-26v11c0 15-10 25-25 25-18 0-31-14-31-34v-30Zm50-21a12 12 0 1 0 0 24 12 12 0 0 0 0-24Zm38 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Z" fill="#171613"/>
+  <path d="M256 285c-9 0-17-7-17-16v-20h34v20c0 9-8 16-17 16Z" fill="#c6a33a"/>
+  <text x="256" y="390" text-anchor="middle" direction="rtl" font-family="Arial,sans-serif" font-size="76" font-weight="700" fill="#f7f3e8">قرارة</text>
+</svg>
