@@ -5,8 +5,7 @@ import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
   process.env.SUPABASE_SECRET_KEY ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
@@ -27,8 +26,8 @@ export async function GET(request: NextRequest) {
   try {
     if (!supabase) {
       return NextResponse.json(
-        { success: false, error: "Supabase connection is missing" },
-        { status: 500 }
+        { success: false, error: "تعذر عرض الإحصاءات: أضف SUPABASE_SECRET_KEY إلى متغيرات الخادم ثم أعد النشر." },
+        { status: 503 }
       );
     }
 

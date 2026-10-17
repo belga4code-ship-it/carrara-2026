@@ -30,6 +30,7 @@ interface ResponseItem {
 export default function AdminDashboard() {
   const [responses, setResponses] = useState<ResponseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [responsesError, setResponsesError] = useState("");
   const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
 
   const fetchResponses = useCallback(async () => {
     setLoading(true);
+    setResponsesError("");
     try {
       const res = await fetch("/api/admin/responses");
       if (res.status === 401) {
@@ -49,9 +51,15 @@ export default function AdminDashboard() {
         return;
       }
       const data = await res.json();
-      if (data.success) setResponses(data.data || []);
+      if (data.success) {
+        setResponses(data.data || []);
+      } else {
+        setResponses([]);
+        setResponsesError(data.error || "تعذر تحميل الردود.");
+      }
     } catch (err) {
       console.error("فشل في جلب البيانات", err);
+      setResponsesError("تعذر الاتصال بالخادم لتحميل الردود.");
     } finally {
       setLoading(false);
     }
@@ -359,6 +367,12 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
+
+        {responsesError && (
+          <div role="alert" className="rounded-2xl border border-amber-700/50 bg-amber-950/50 px-5 py-4 text-sm font-semibold leading-7 text-amber-200">
+            {responsesError}
+          </div>
+        )}
 
         {/* كروت المؤشرات الرئيسية (KPIs) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
