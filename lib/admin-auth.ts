@@ -8,7 +8,7 @@ function readServerEnv(name: string): string | undefined {
 }
 
 export function hasAdminAuthConfig(): boolean {
-  return Boolean(readServerEnv("ADMIN_PASSWORD") && readServerEnv("ADMIN_SESSION_SECRET"));
+  return Boolean(readServerEnv("ADMIN_PASSWORD"));
 }
 
 export function verifyAdminPassword(value: unknown): boolean {
@@ -20,7 +20,9 @@ export function verifyAdminPassword(value: unknown): boolean {
 }
 
 export function createAdminSessionToken(): string | null {
-  const secret = readServerEnv("ADMIN_SESSION_SECRET");
+  // Reuse the configured admin password as the signing key so hosting needs
+  // only one credential and no extra secret that can be copied into build output.
+  const secret = readServerEnv("ADMIN_PASSWORD");
   if (!secret) return null;
   const expiresAt = String(Math.floor(Date.now() / 1000) + 60 * 60 * 8);
   const signature = createHmac("sha256", secret).update(expiresAt).digest("hex");
@@ -28,7 +30,7 @@ export function createAdminSessionToken(): string | null {
 }
 
 export function verifyAdminSession(token: string | undefined): boolean {
-  const secret = readServerEnv("ADMIN_SESSION_SECRET");
+  const secret = readServerEnv("ADMIN_PASSWORD");
   if (!secret || !token) return false;
   const [expiresAt, signature, extra] = token.split(".");
   if (!expiresAt || !signature || extra || !/^\d+$/.test(expiresAt)) return false;
