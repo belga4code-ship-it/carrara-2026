@@ -19,7 +19,6 @@ interface FormDataState {
   qualityRating: string;
   varietyRating: string;
   varietyDetails: string;
-  priceRating: string;
   previousDealing: string;
   noPurchaseReasons: string[];
   noPurchaseReasonOther: string;
@@ -47,7 +46,6 @@ const initialFormData: FormDataState = {
   qualityRating: "",
   varietyRating: "",
   varietyDetails: "",
-  priceRating: "",
   previousDealing: "",
   noPurchaseReasons: [],
   noPurchaseReasonOther: "",
@@ -230,7 +228,7 @@ function SurveyFormContent() {
             تأسست 1991
           </span>
           <h1 className="text-2xl font-black mt-2 tracking-wide">شركة قرارة للرخام والجرانيت</h1>
-          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان الزوار | {formData.branch}</p>
+          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان الزوار</p>
 
           {/* شريط التقدم */}
           {step < 4 && (
@@ -249,12 +247,6 @@ function SurveyFormContent() {
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-yellow-950/40 text-yellow-300 rounded-2xl flex items-center justify-center mx-auto shadow-inner mb-3">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold text-slate-100">أهلاً بك في {formData.branch}</h2>
                 <p className="text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
                   رقم الهاتف مطلوب للتواصل معك، أما الاسم فيمكنك تركه فارغًا.
                 </p>
@@ -564,32 +556,6 @@ function SurveyFormContent() {
                     </div>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-100 mb-2">3. كيف ترى الأسعار مقارنة بالجودة؟</label>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {["مناسبة جداً", "مناسبة", "مرتفعة قليلاً", "مرتفعة جداً", "لم أتعرف على الأسعار بعد"].map((p) => (
-                      <label
-                        key={p}
-                        className={`flex items-center gap-2 border-2 p-3 rounded-xl cursor-pointer transition font-semibold ${
-                          formData.priceRating === p
-                            ? "border-yellow-400 bg-yellow-950/40 text-yellow-100"
-                            : "border-slate-700 hover:bg-slate-800/70 text-slate-200"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="priceRating"
-                          value={p}
-                          checked={formData.priceRating === p}
-                          onChange={(e) => setFormData({...formData, priceRating: e.target.value})}
-                          className="w-4 h-4 text-yellow-400"
-                        />
-                        <span>{p}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-sm font-bold text-slate-100 mb-2">كيف تقيّم تجربة جناح شركة قرارة في المعرض؟</label>
                   <div className="grid grid-cols-3 gap-2 text-sm">
