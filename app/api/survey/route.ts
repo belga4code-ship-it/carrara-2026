@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { isBranchName } from "@/lib/branches";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // The public survey endpoint uses the publishable key and relies on database RLS.
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
       const value = formData.get(key);
       return typeof value === "string" ? value : "";
     };
+    const branch = getString("branch").trim();
+    if (!isBranchName(branch)) {
+      return NextResponse.json({ success: false, error: "يرجى اختيار فرع صحيح من القائمة" }, { status: 400 });
+    }
     const parseStringArray = (key: string): string[] => {
       try {
         const value: unknown = JSON.parse(getString(key));
@@ -66,16 +71,24 @@ export async function POST(request: Request) {
     }
     const varietyDetails = getString("varietyDetails").trim().slice(0, 1000);
     const salesContactDetails = getString("salesContactDetails").trim().slice(0, 1000);
-    const exhibitionDetails = getString("exhibitionDetails").trim().slice(0, 1000);
+    const informationRating = getString("informationRating");
+    const informationDetails = getString("informationDetails").trim().slice(0, 1000);
+    if (informationRating === "غير واضحة" && !informationDetails) {
+      return NextResponse.json({ success: false, error: "يرجى تحديد المنتجات أو الخامات التي تحتاج معلومات عنها" }, { status: 400 });
+    }
+    const branchDetails = (getString("branchDetails") || getString("exhibitionDetails")).trim().slice(0, 1000);
+    const branchRating = getString("branchRating") || getString("exhibitionRating");
     const missingMaterial = getString("missingMaterial").trim().slice(0, 500);
     const notes = [
       getString("notes").trim().slice(0, 3000),
       noPurchaseReasons.length ? `أسباب عدم إتمام الشراء: ${noPurchaseReasons.join("، ")}${getString("noPurchaseReasonOther") ? ` — ${getString("noPurchaseReasonOther").trim().slice(0, 500)}` : ""}` : "",
       varietyDetails ? `تفاصيل تنوع الخامات: ${varietyDetails}` : "",
       salesContactDetails ? `تفاصيل تجربة المبيعات: ${salesContactDetails}` : "",
-      exhibitionDetails ? `تفاصيل تجربة الجناح: ${exhibitionDetails}` : "",
+      informationRating ? `وضوح معلومات المنتجات والخامات: ${informationRating}` : "",
+      informationDetails ? `منتجات وخامات تحتاج إلى معلومات: ${informationDetails}` : "",
+      branchDetails ? `تفاصيل تجربة الفرع: ${branchDetails}` : "",
       missingMaterial ? `خامة غير متوفرة: ${missingMaterial}` : "",
-      getString("exhibitionRating") ? `تقييم تجربة جناح المعرض: ${getString("exhibitionRating")}` : "",
+      branchRating ? `تقييم تجربة الفرع: ${branchRating}` : "",
       newsletterOptIn ? "موافقة على استلام أخبار المنتجات والعروض عبر البريد الإلكتروني: نعم" : "",
     ];
     const phone = getString("phone").trim();
@@ -157,7 +170,7 @@ export async function POST(request: Request) {
       previousDealing: getString("previousDealing"),
       salesContact: getString("salesContact"),
       invoiceNo: getString("invoiceNo"),
-      branch: getString("branch"),
+      branch,
     };
     const { error } = await supabase
       .from("survey_responses")

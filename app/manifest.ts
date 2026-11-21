@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "استبيان معرض قرارة",
+    name: "استبيان فروع قرارة",
     short_name: "قرارة",
-    description: "استبيان زوار شركة قرارة للرخام والجرانيت",
+    description: "شاركنا رأيك في الفرع الذي زرته من فروع شركة قرارة",
     start_url: "/",
     scope: "/",
     display: "standalone",

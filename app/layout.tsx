@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "استبيان زوار شركة قرارة للرخام والجرانيت",
-  description: "شاركنا رأيك في منتجاتنا وخدماتنا لنواصل تحسين تجربتك.",
-  applicationName: "استبيان معرض قرارة",
+  title: "استبيان تقييم فروع قرارة",
+  description: "شاركنا رأيك في الفرع الذي زرته لنواصل تحسين خدماتنا.",
+  applicationName: "استبيان فروع قرارة",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

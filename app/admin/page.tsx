@@ -27,6 +27,25 @@ interface ResponseItem {
   attachment_url?: string | null;
 }
 
+function getBranchRatingFromNotes(notes: string | null) {
+  const prefixes = ["تقييم تجربة الفرع:", "تقييم تجربة جناح المعرض:"];
+  const line = notes?.split(/\r?\n/).find((entry) => prefixes.some((prefix) => entry.startsWith(prefix)));
+  const prefix = prefixes.find((candidate) => line?.startsWith(candidate));
+  return line && prefix ? line.slice(prefix.length).trim() : "-";
+}
+
+function getInformationRatingFromNotes(notes: string | null) {
+  const prefix = "وضوح معلومات المنتجات والخامات:";
+  const line = notes?.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
+  return line ? line.slice(prefix.length).trim() : "-";
+}
+
+function getInformationDetailsFromNotes(notes: string | null) {
+  const prefix = "منتجات وخامات تحتاج إلى معلومات:";
+  const line = notes?.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
+  return line ? line.slice(prefix.length).trim() : "-";
+}
+
 export default function AdminDashboard() {
   const [responses, setResponses] = useState<ResponseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -163,8 +182,8 @@ export default function AdminDashboard() {
     );
   }
   // --- دالة تصدير البيانات إلى Excel المعالجة والمحدثة ---
-  const exportToExcel = () => {
-    if (filteredResponses.length === 0) {
+  const exportToExcel = (itemsToExport = filteredResponses, exportScope = "المعروض") => {
+    if (itemsToExport.length === 0) {
       alert("لا توجد بيانات متاحة للتصدير حالياً.");
       return;
     }
@@ -186,6 +205,9 @@ export default function AdminDashboard() {
       "جودة التشطيب",
       "تنوع المنتجات",
       "تقييم الأسعار",
+      "وضوح معلومات المنتجات والخامات",
+      "المنتجات والخامات التي تحتاج معلومات",
+      "تقييم تجربة الفرع أو الجناح",
       "المنتجات المهتم بها",
       "ملاحظات إضافية"
     ];
@@ -199,7 +221,7 @@ export default function AdminDashboard() {
       return `"${str}"`;
     };
 
-    const rows = filteredResponses.map((item) => [
+    const rows = itemsToExport.map((item) => [
       cleanCell(item.id),
       cleanCell(new Date(item.created_at).toLocaleString("ar-LY")),
       cleanCell(item.has_problem ? "شكوى" : "استبيان"),
@@ -216,6 +238,9 @@ export default function AdminDashboard() {
       cleanCell(item.quality_rating || "-"),
       cleanCell(item.variety_rating || "-"),
       cleanCell(item.price_rating || "-"),
+      cleanCell(getInformationRatingFromNotes(item.notes)),
+      cleanCell(getInformationDetailsFromNotes(item.notes)),
+      cleanCell(getBranchRatingFromNotes(item.notes)),
       cleanCell(Array.isArray(item.interests) ? item.interests.join(" - ") : "-"),
       cleanCell(item.notes || "-")
     ]);
@@ -235,7 +260,7 @@ export default function AdminDashboard() {
     const today = new Date().toISOString().slice(0, 10);
 
     link.setAttribute("href", url);
-    link.setAttribute("download", `استبيانات_وشكاوى_قرارة_${today}.csv`);
+    link.setAttribute("download", `آراء_الفروع_قرارة_${exportScope}_${today}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -251,7 +276,7 @@ export default function AdminDashboard() {
       cleanPhone = "218" + cleanPhone;
     }
     const message = encodeURIComponent(
-      `أهلاً بك أ. ${name}، نحن فريق خدمة العملاء بشركة قرارة للرخام والجرانيت. بخصوص مشاركتك معنا في استبيان المعرض (فاتورة: ${invoice || "غير محدد"})...`
+      `أهلاً بك أ. ${name}، نحن فريق خدمة العملاء بشركة قرارة للرخام والجرانيت. بخصوص مشاركتك معنا في استبيان تقييم الفرع (فاتورة: ${invoice || "غير محدد"})...`
     );
     return `https://wa.me/${cleanPhone}?text=${message}`;
   };
@@ -322,11 +347,13 @@ export default function AdminDashboard() {
       .sort((a, b) => b.count - a.count);
   };
 
-  const getNotesDistribution = (prefix: string) => {
+  const getNotesDistribution = (prefix: string | string[]) => {
+    const prefixes = Array.isArray(prefix) ? prefix : [prefix];
     const counts: Record<string, number> = {};
     filteredResponses.forEach((item) => {
-      const line = item.notes?.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
-      const value = line?.slice(prefix.length).trim();
+      const line = item.notes?.split(/\r?\n/).find((entry) => prefixes.some((candidate) => entry.startsWith(candidate)));
+      const matchingPrefix = prefixes.find((candidate) => line?.startsWith(candidate));
+      const value = line && matchingPrefix ? line.slice(matchingPrefix.length).trim() : "";
       if (value) counts[value] = (counts[value] || 0) + 1;
     });
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
@@ -344,13 +371,15 @@ export default function AdminDashboard() {
   const dealingStats = getDistribution("previous_dealing");
   const branchStats = getDistribution("branch");
   const interestStats = getInterestsDistribution();
-  const exhibitionStats = getNotesDistribution("تقييم تجربة جناح المعرض:");
+  const informationRatingStats = getNotesDistribution("وضوح معلومات المنتجات والخامات:");
+  const branchExperienceStats = getNotesDistribution(["تقييم تجربة الفرع:", "تقييم تجربة جناح المعرض:"]);
   const analyticsCards = [
     { title: "جودة المنتجات والتشطيب", icon: "✦", stats: qualityStats },
     { title: "توفر الخيارات المناسبة", icon: "✓", stats: varietyStats },
     { title: "تجربة فريق المبيعات", icon: "◉", stats: salesStats },
     { title: "تقييم الأسعار", icon: "د.ل", stats: priceStats },
-    { title: "تجربة جناح المعرض", icon: "⌂", stats: exhibitionStats },
+    { title: "وضوح معلومات المنتجات والخامات", icon: "ℹ", stats: informationRatingStats },
+    { title: "تقييم تجربة الفرع", icon: "⌂", stats: branchExperienceStats },
     { title: "صفة الزوار", icon: "♙", stats: roleStats },
     { title: "نوع المشروع", icon: "▦", stats: projectStats },
     { title: "التعامل السابق", icon: "↗", stats: dealingStats },
@@ -384,7 +413,7 @@ export default function AdminDashboard() {
             <p className="text-slate-400 text-sm mt-1">متابعة الأداء، تحليل تفضيلات الزوار، والمعالجة الفورية للشكاوى</p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             <button
               onClick={exportToPdf}
               className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-4 py-2.5 rounded-xl text-sm font-black transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
@@ -398,10 +427,16 @@ export default function AdminDashboard() {
               تسجيل الخروج
             </button>
             <button
-              onClick={exportToExcel}
+              onClick={() => exportToExcel()}
               className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-emerald-600/20"
             >
-              📥 تصدير Excel منظم
+              📥 تصدير المعروض Excel
+            </button>
+            <button
+              onClick={() => exportToExcel(responses, "كل_البيانات")}
+              className="bg-teal-700 hover:bg-teal-600 active:scale-95 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-teal-700/20"
+            >
+              📥 تصدير كل البيانات
             </button>
 
             <button
@@ -429,7 +464,7 @@ export default function AdminDashboard() {
           <div className="dashboard-kpi border-emerald-500/30">
             <span>الاستبيانات المكتملة</span>
             <strong className="text-emerald-400">{totalSurveys}</strong>
-            <small>مشاركة تضمنت تقييمًا للمعرض</small>
+            <small>مشاركة تضمنت تقييمًا للفرع</small>
           </div>
           <div className="dashboard-kpi border-red-500/30">
             <span>الشكاوى</span>

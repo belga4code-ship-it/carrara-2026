@@ -31,31 +31,43 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("survey_responses")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const pageSize = 1000;
+    const allResponses: Record<string, unknown>[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("survey_responses")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-    if (error) {
-      const message = /invalid api key/i.test(error.message)
-        ? "مفتاح Supabase الخاص بلوحة الإدارة غير صالح. حدّث SUPABASE_SECRET_KEY أو SUPABASE_SERVICE_ROLE_KEY من إعدادات المشروع الصحيح."
-        : error.message;
-      return NextResponse.json(
-        { success: false, error: message },
-        { status: 500 }
-      );
+      if (error) {
+        const message = /invalid api key/i.test(error.message)
+          ? "مفتاح Supabase الخاص بلوحة الإدارة غير صالح. حدّث SUPABASE_SECRET_KEY أو SUPABASE_SERVICE_ROLE_KEY من إعدادات المشروع الصحيح."
+          : error.message;
+        return NextResponse.json({ success: false, error: message }, { status: 500 });
+      }
+
+      const page = data ?? [];
+      allResponses.push(...page);
+      if (page.length < pageSize) break;
     }
 
-    const dataWithAttachments = await Promise.all((data ?? []).map(async (item) => {
-      const match = typeof item.notes === "string"
-        ? item.notes.match(/صورة مرجعية مرفقة: ([a-f0-9-]+\.(?:jpg|png|webp))/i)
-        : null;
-      if (!match || !supabaseStorageAdmin) return { ...item, attachment_url: null };
-      const { data: signed, error: signedUrlError } = await supabaseStorageAdmin.storage
-        .from(REFERENCE_BUCKET)
-        .createSignedUrl(match[1], 60 * 10);
-      return { ...item, attachment_url: signedUrlError ? null : signed.signedUrl };
-    }));
+    const dataWithAttachments: Record<string, unknown>[] = [];
+    for (let offset = 0; offset < allResponses.length; offset += 50) {
+      const batch = allResponses.slice(offset, offset + 50);
+      const batchWithAttachments = await Promise.all(batch.map(async (item) => {
+        const match = typeof item.notes === "string"
+          ? item.notes.match(/صورة مرجعية مرفقة: ([a-f0-9-]+\.(?:jpg|png|webp))/i)
+          : null;
+        if (!match || !supabaseStorageAdmin) return { ...item, attachment_url: null };
+        const { data: signed, error: signedUrlError } = await supabaseStorageAdmin.storage
+          .from(REFERENCE_BUCKET)
+          .createSignedUrl(match[1], 60 * 10);
+        return { ...item, attachment_url: signedUrlError ? null : signed.signedUrl };
+      }));
+      dataWithAttachments.push(...batchWithAttachments);
+    }
 
     return NextResponse.json({ success: true, data: dataWithAttachments }, { status: 200 });
   } catch {

@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { BRANCHES } from "@/lib/branches";
 
 interface FormDataState {
   hasProblem: boolean;
@@ -25,8 +26,10 @@ interface FormDataState {
   newsletterOptIn: boolean;
   salesContact: string;
   salesContactDetails: string;
-  exhibitionRating: string;
-  exhibitionDetails: string;
+  informationRating: string;
+  informationDetails: string;
+  branchRating: string;
+  branchDetails: string;
   missingMaterial: string;
   notes: string;
   branch: string;
@@ -52,23 +55,26 @@ const initialFormData: FormDataState = {
   newsletterOptIn: false,
   salesContact: "",
   salesContactDetails: "",
-  exhibitionRating: "",
-  exhibitionDetails: "",
+  informationRating: "",
+  informationDetails: "",
+  branchRating: "",
+  branchDetails: "",
   missingMaterial: "",
   notes: "",
-  branch: "الإدارة الرئيسية",
+  branch: "",
 };
 
 function SurveyFormContent() {
   const searchParams = useSearchParams();
-  const branch = searchParams.get("branch") || "الإدارة الرئيسية";
+  const branchParam = (searchParams.get("branch") || "").trim();
+  const branchFromLink = BRANCHES.find((branchOption) => branchOption === branchParam) || "";
   const [step, setStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
 
-  const [formData, setFormData] = useState<FormDataState>(() => ({ ...initialFormData, branch }));
+  const [formData, setFormData] = useState<FormDataState>(() => ({ ...initialFormData, branch: branchFromLink }));
 
   // عرض التاريخ حسب التوقيت المحلي وبصيغة عربية
   const currentDate = new Intl.DateTimeFormat("ar-LY", { dateStyle: "long" }).format(new Date());
@@ -92,6 +98,7 @@ function SurveyFormContent() {
 
   const validateStep1 = () => {
     const newErrors: { [key: string]: string } = {};
+    if (!formData.branch.trim()) newErrors.branch = "يرجى تحديد الفرع";
     const normalizedPhone = formData.phone
       .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
       .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
@@ -112,10 +119,13 @@ function SurveyFormContent() {
     if (formData.projectType === "أخرى" && !formData.projectTypeOther.trim()) {
       newErrors.projectTypeOther = "يرجى تحديد نوع المشروع";
     }
-    if (formData.previousDealing === "زرت المعرض دون شراء" && formData.noPurchaseReasons.length === 0) {
+    if (formData.informationRating === "غير واضحة" && !formData.informationDetails.trim()) {
+      newErrors.informationDetails = "اكتب المنتجات أو الخامات التي ترغب في الاستفسار عنها";
+    }
+    if (formData.previousDealing === "سبق لي زيارة هذا الفرع دون شراء" && formData.noPurchaseReasons.length === 0) {
       newErrors.noPurchaseReasons = "اختر سببًا واحدًا على الأقل";
     }
-    if (formData.previousDealing === "زرت المعرض دون شراء" && formData.noPurchaseReasons.includes("سبب آخر") && !formData.noPurchaseReasonOther.trim()) {
+    if (formData.previousDealing === "سبق لي زيارة هذا الفرع دون شراء" && formData.noPurchaseReasons.includes("سبب آخر") && !formData.noPurchaseReasonOther.trim()) {
       newErrors.noPurchaseReasonOther = "يرجى توضيح السبب الآخر";
     }
     if (formData.email.trim() && !formData.newsletterOptIn) {
@@ -228,7 +238,7 @@ function SurveyFormContent() {
             تأسست 1991
           </span>
           <h1 className="text-2xl font-black mt-2 tracking-wide">شركة قرارة للرخام والجرانيت</h1>
-          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان الزوار</p>
+          <p className="text-slate-300 text-xs mt-1 font-medium">استبيان تقييم الفروع{formData.branch ? ` | فرع ${formData.branch}` : ""}</p>
 
           {/* شريط التقدم */}
           {step < 4 && (
@@ -248,8 +258,25 @@ function SurveyFormContent() {
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <p className="text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
-                  رقم الهاتف مطلوب للتواصل معك، أما الاسم فيمكنك تركه فارغًا.
+                  رأيك يساعد الإدارة على تحسين الخدمة في هذا الفرع. رقم الهاتف مطلوب للتواصل، والاسم اختياري.
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="survey-branch" className="mb-1.5 block text-sm font-bold text-slate-100">الفرع <span className="text-red-400">*</span></label>
+                <select
+                  id="survey-branch"
+                  value={formData.branch}
+                  onChange={(event) => {
+                    setFormData({ ...formData, branch: event.target.value });
+                    if (errors.branch) clearError("branch");
+                  }}
+                  className={`w-full rounded-xl border-2 bg-slate-950 p-3 text-sm font-semibold text-slate-100 focus:border-yellow-400 focus:outline-none ${errors.branch ? "border-red-500" : "border-slate-600"}`}
+                >
+                  <option value="">اختر الفرع الذي تزوره</option>
+                  {BRANCHES.map((branchOption) => <option key={branchOption} value={branchOption}>{branchOption}</option>)}
+                </select>
+                {errors.branch && <p className="mt-1 text-xs font-semibold text-red-400">{errors.branch}</p>}
               </div>
 
               <div className="bg-yellow-950/40 border border-yellow-400/20 p-3.5 rounded-2xl text-xs text-slate-100 flex justify-between items-center shadow-sm">
@@ -372,17 +399,17 @@ function SurveyFormContent() {
               <div className="space-y-4 border-b border-slate-700 pb-6">
                 <h3 className="text-base font-black text-yellow-300 flex items-center gap-2">
                   <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
-                  هل سبق لك التعامل مع الشركة؟
+                  هل سبق لك زيارة هذا الفرع؟
                 </h3>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {["هذه أول زيارة", "زرت المعرض دون شراء", "نعم، سبق لي الشراء"].map((answer) => (
+                  {["هذه أول زيارة لهذا الفرع", "سبق لي زيارة هذا الفرع دون شراء", "سبق لي الشراء من الشركة"].map((answer) => (
                     <label key={answer} className={`flex items-center gap-2 rounded-xl border-2 p-3 text-sm font-semibold transition cursor-pointer ${formData.previousDealing === answer ? "border-yellow-400 bg-yellow-950/40 text-yellow-100" : "border-slate-700 text-slate-300 hover:bg-slate-800/70"}`}>
-                      <input type="radio" name="previousDealing" value={answer} checked={formData.previousDealing === answer} onChange={(event) => setFormData({ ...formData, previousDealing: event.target.value, qualityRating: event.target.value === "نعم، سبق لي الشراء" ? formData.qualityRating : "", noPurchaseReasons: event.target.value === "زرت المعرض دون شراء" ? formData.noPurchaseReasons : [], noPurchaseReasonOther: event.target.value === "زرت المعرض دون شراء" ? formData.noPurchaseReasonOther : "" })} className="h-4 w-4 accent-yellow-400" />
+                      <input type="radio" name="previousDealing" value={answer} checked={formData.previousDealing === answer} onChange={(event) => setFormData({ ...formData, previousDealing: event.target.value, qualityRating: event.target.value === "سبق لي الشراء من الشركة" ? formData.qualityRating : "", noPurchaseReasons: event.target.value === "سبق لي زيارة هذا الفرع دون شراء" ? formData.noPurchaseReasons : [], noPurchaseReasonOther: event.target.value === "سبق لي زيارة هذا الفرع دون شراء" ? formData.noPurchaseReasonOther : "" })} className="h-4 w-4 accent-yellow-400" />
                       <span>{answer}</span>
                     </label>
                   ))}
                 </div>
-                {formData.previousDealing === "زرت المعرض دون شراء" && (
+                {formData.previousDealing === "سبق لي زيارة هذا الفرع دون شراء" && (
                   <div className="rounded-2xl border border-yellow-400/30 bg-yellow-950/20 p-4 space-y-3">
                     <label className="block text-sm font-bold text-slate-100">ما الأسباب التي حالت دون إتمام الشراء؟ <span className="font-normal text-slate-400">(يمكن اختيار أكثر من سبب)</span></label>
                     {["الأسعار لم تناسب ميزانيتي", "لم أجد نوع الخام الذي أبحث عنه", "لم أجد اللون أو التصميم المناسب", "الكمية المطلوبة لم تكن متوفرة", "وجدت خيارات أنسب لدى شركة أخرى", "سبب آخر"].map((reason) => (
@@ -478,10 +505,10 @@ function SurveyFormContent() {
               <div className="space-y-6 border-b border-slate-700 pb-6">
                 <h3 className="text-base font-black text-yellow-300 flex items-center gap-2">
                   <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
-                  ثالثاً: تقييم المعرض والمنتجات والخدمة
+                  ثالثاً: تقييم الفرع والمنتجات والخدمة
                 </h3>
 
-                {formData.previousDealing === "نعم، سبق لي الشراء" && <div>
+                {formData.previousDealing === "سبق لي الشراء من الشركة" && <div>
                   <label className="block text-sm font-bold text-slate-100 mb-2">1. ما مدى رضاك عن جودة المنتجات ومستوى التشطيب؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {["ممتاز", "جيد جداً", "متوسط", "بحاجة إلى تحسين"].map((q) => (
@@ -540,7 +567,7 @@ function SurveyFormContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-100 mb-2">كيف تقيّم تعامل فريق المبيعات وسرعة الاستجابة؟</label>
+                  <label className="block text-sm font-bold text-slate-100 mb-2">كيف تقيّم تعامل موظفي الفرع وسرعة الاستجابة؟</label>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {["ممتاز", "جيد جداً", "مقبول", "بحاجة إلى تحسين", "لم أتحدث مع فريق المبيعات"].map((rating) => (
                       <label key={rating} className="flex items-center gap-2 rounded-xl border-2 border-slate-700 p-3 font-semibold text-slate-200 transition hover:bg-slate-800/70">
@@ -557,26 +584,55 @@ function SurveyFormContent() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-100 mb-2">كيف تقيّم تجربة جناح شركة قرارة في المعرض؟</label>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    {["ممتازة", "متوسطة", "بحاجة إلى تحسين"].map((rating) => (
-                      <label key={rating} className={`flex items-center gap-2 rounded-xl border-2 p-3 font-semibold cursor-pointer transition ${formData.exhibitionRating === rating ? "border-yellow-400 bg-yellow-950/40 text-yellow-100" : "border-slate-700 text-slate-200 hover:bg-slate-800/70"}`}>
-                        <input type="radio" name="exhibitionRating" value={rating} checked={formData.exhibitionRating === rating} onChange={(event) => setFormData({ ...formData, exhibitionRating: event.target.value, exhibitionDetails: event.target.value === "بحاجة إلى تحسين" ? formData.exhibitionDetails : "" })} className="h-4 w-4 accent-yellow-400" />
+                  <label className="block text-sm font-bold text-slate-100 mb-2">كيف تقيّم وضوح المعلومات التي حصلت عليها عن المنتجات والخامات؟</label>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {["واضحة جداً", "واضحة", "مقبولة", "غير واضحة", "لم أستفسر عن المنتجات والخامات"].map((rating) => (
+                      <label key={rating} className={`flex items-center gap-2 rounded-xl border-2 p-3 font-semibold cursor-pointer transition ${formData.informationRating === rating ? "border-yellow-400 bg-yellow-950/40 text-yellow-100" : "border-slate-700 text-slate-200 hover:bg-slate-800/70"}`}>
+                        <input type="radio" name="informationRating" value={rating} checked={formData.informationRating === rating} onChange={(event) => setFormData({ ...formData, informationRating: event.target.value, informationDetails: event.target.value === "غير واضحة" ? formData.informationDetails : "" })} className="h-4 w-4 accent-yellow-400" />
                         <span>{rating}</span>
                       </label>
                     ))}
                   </div>
-                  {formData.exhibitionRating === "بحاجة إلى تحسين" && (
+                  {formData.informationRating === "غير واضحة" && (
+                    <div className="mt-3">
+                      <label htmlFor="information-details" className="mb-1 block text-xs font-semibold text-slate-300">ما المنتجات أو الخامات التي ترغب في الاستفسار عنها؟ <span className="text-red-400">*</span></label>
+                      <textarea
+                        id="information-details"
+                        rows={2}
+                        maxLength={1000}
+                        value={formData.informationDetails}
+                        onChange={(event) => {
+                          setFormData({ ...formData, informationDetails: event.target.value });
+                          if (errors.informationDetails) clearError("informationDetails");
+                        }}
+                        placeholder="اكتب أسماء المنتجات أو الخامات"
+                        className={`w-full rounded-xl border-2 bg-slate-950 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none ${errors.informationDetails ? "border-red-500" : "border-slate-700"}`}
+                      />
+                      {errors.informationDetails && <p className="mt-1 text-xs font-semibold text-red-400">{errors.informationDetails}</p>}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-100 mb-2">ما مدى رضاك عن تجربتك في هذا الفرع؟</label>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    {["ممتازة", "متوسطة", "بحاجة إلى تحسين"].map((rating) => (
+                      <label key={rating} className={`flex items-center gap-2 rounded-xl border-2 p-3 font-semibold cursor-pointer transition ${formData.branchRating === rating ? "border-yellow-400 bg-yellow-950/40 text-yellow-100" : "border-slate-700 text-slate-200 hover:bg-slate-800/70"}`}>
+                        <input type="radio" name="branchRating" value={rating} checked={formData.branchRating === rating} onChange={(event) => setFormData({ ...formData, branchRating: event.target.value, branchDetails: event.target.value === "بحاجة إلى تحسين" ? formData.branchDetails : "" })} className="h-4 w-4 accent-yellow-400" />
+                        <span>{rating}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {formData.branchRating === "بحاجة إلى تحسين" && (
                     <div className="mt-3">
                       <label className="mb-1 block text-xs font-semibold text-slate-300">ما الذي تقترح تحسينه؟ <span className="font-normal text-slate-400">(اختياري)</span></label>
-                      <textarea rows={2} value={formData.exhibitionDetails} onChange={(event) => setFormData({ ...formData, exhibitionDetails: event.target.value })} placeholder="اكتب اقتراحك لتحسين تجربة الجناح." className="w-full rounded-xl border-2 border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none" />
+                      <textarea rows={2} value={formData.branchDetails} onChange={(event) => setFormData({ ...formData, branchDetails: event.target.value })} placeholder="اكتب اقتراحك لتحسين الخدمة أو تجربة الفرع." className="w-full rounded-xl border-2 border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none" />
                     </div>
                   )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-700 bg-slate-950 p-4 space-y-3">
                   <div>
-                    <label className="block text-sm font-bold text-slate-100 mb-1.5">هل توجد خامة معينة لم تجدها متوفرة في المعرض؟ <span className="font-medium text-slate-400">(اختياري)</span></label>
+                    <label className="block text-sm font-bold text-slate-100 mb-1.5">هل توجد خامة معينة لم تجدها متوفرة في هذا الفرع؟ <span className="font-medium text-slate-400">(اختياري)</span></label>
                     <input type="text" value={formData.missingMaterial} onChange={(event) => setFormData({ ...formData, missingMaterial: event.target.value })} placeholder="اكتب اسم الخامة إن وجدت" className="w-full rounded-xl border-2 border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 focus:border-yellow-400 focus:outline-none" />
                   </div>
                   <div>
@@ -672,7 +728,7 @@ function SurveyFormContent() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-slate-100">شكراً لحسن تعاونكم!</h2>
                 <p className="text-slate-400 text-sm font-medium max-w-sm mx-auto leading-relaxed">
-                  تم استلام مشاركتكم بنجاح في {formData.branch}. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
+                  تم استلام رأيكم بنجاح عن فرع {formData.branch}. نعتز بزيارتكم وثقتكم بشركة قرارة للرخام والجرانيت.
                 </p>
               </div>
 
